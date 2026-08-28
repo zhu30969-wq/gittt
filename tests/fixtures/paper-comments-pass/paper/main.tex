@@ -1,0 +1,26 @@
+\documentclass{article}
+\usepackage{cleveref}
+\usepackage{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+% claim:c10 is a different complete token and must not satisfy claim:c1.
+% claim:c1
+% TODO in a source comment is not unfinished rendered paper text.
+% \write18{commented-dangerous-command}
+% \cref{missing-comment-label}\parencite{missing-comment-citation}
+% \input{missing-comment-include}\includegraphics{missing-comment-image.png}
+\begin{verbatim}
+TODO \write18{verbatim} \cref{missing-verbatim-label}
+\input{missing-verbatim-include}\includegraphics{missing-verbatim-image.png}
+% claim:c1
+\end{verbatim}
+\begin{lstlisting}
+TODO \parencite{missing-listing-citation}
+\end{lstlisting}
+\begin{minted}{python}
+print("TODO and \\ref{missing-minted-label}")
+\end{minted}
+\section{Checked source}\label{sec:checked}
+The checked section resolves through \cref{sec:checked} and cites a registered source
+with \parencite*[see][p.~1]{smith2026}.
+\end{document}

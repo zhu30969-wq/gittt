@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "results.schema.json",
+  "title": "CUMCM experiment results",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "results"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "experiment_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "run_status": {"type": "string", "enum": ["success", "failed", "partial"]},
+    "fingerprints": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "common.schema.json#/$defs/sha256"},
+      "propertyNames": {"$ref": "common.schema.json#/$defs/typedId"}
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {"$ref": "common.schema.json#/$defs/typedId"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "cwd": {"$ref": "common.schema.json#/$defs/relativePath"},
+        "exit_code": {"type": "integer"},
+        "seeds": {"type": "array", "items": {"type": "integer"}},
+        "platform": {"type": "string", "minLength": 1},
+        "git_commit": {"type": ["string", "null"]},
+        "git_dirty": {"type": ["boolean", "null"]},
+        "environment_note": {"type": "string", "minLength": 1}
+      },
+      "required": ["run_id", "started_at", "finished_at", "argv", "cwd", "exit_code", "seeds", "platform", "git_commit", "git_dirty", "environment_note"]
+    },
+    "inputs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "output_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "file": {"$ref": "common.schema.json#/$defs/fileRef"},
+          "comparison_status": {"$ref": "common.schema.json#/$defs/validationStatus"},
+          "comparison_note": {"type": "string", "minLength": 1}
+        },
+        "required": ["output_ref", "file", "comparison_status", "comparison_note"]
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "measurement": {"$ref": "common.schema.json#/$defs/measurement"},
+          "sample_size": {"type": "integer", "minimum": 0},
+          "uncertainty": {
+            "type": ["object", "null"],
+            "properties": {
+              "kind": {"type": "string", "minLength": 1},
+              "level": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+              "lower": {"type": "number"},
+              "upper": {"type": "number"},
+              "method": {"type": "string", "minLength": 1}
+            },
+            "required": ["kind", "method"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["metric_ref", "measurement", "sample_size", "uncertainty"]
+      }
+    },
+    "diagnostics": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "failure_reason": {"type": ["string", "null"]},
+    "logs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}}
+  },
+  "required": ["experiment_ref", "run_status", "fingerprints", "run", "inputs", "outputs", "metrics", "diagnostics", "warnings", "failure_reason", "logs"],
+  "unevaluatedProperties": false
+}

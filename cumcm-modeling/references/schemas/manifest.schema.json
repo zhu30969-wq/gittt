@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manifest.schema.json",
+  "title": "CUMCM project manifest",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/artifactBase"},
+    {
+      "if": {"properties": {"manifest_type": {"const": "release"}}, "required": ["manifest_type"]},
+      "then": {
+        "properties": {
+          "entrypoints": {"required": ["paper", "run"]},
+          "deliverables": {"minItems": 1}
+        }
+      }
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "manifest"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "manifest_type": {"type": "string", "enum": ["project", "run", "release"]},
+    "project_id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "competition_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "path": {"oneOf": [{"$ref": "common.schema.json#/$defs/relativePath"}, {"type": "null"}]},
+        "note": {"type": "string", "minLength": 1}
+      },
+      "required": ["enabled", "path", "note"]
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "kind": {"type": "string", "enum": ["problem_spec", "model_spec", "experiment", "results", "claims", "figures", "gate_review"]},
+          "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+          "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+          "required": {"type": "boolean"},
+          "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true}
+        },
+        "required": ["id", "kind", "path", "sha256", "required", "depends_on"]
+      }
+    },
+    "entrypoints": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_-]*$"},
+      "additionalProperties": {"$ref": "common.schema.json#/$defs/relativePath"}
+    },
+    "environment_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+          "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+          "size": {"type": "integer", "minimum": 0},
+          "media_type": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "path", "sha256"]
+      }
+    },
+    "deliverables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+          "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+          "required": {"type": "boolean"}
+        },
+        "required": ["id", "path", "sha256", "required"]
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "required": ["manifest_type", "project_id", "competition_profile", "artifacts", "entrypoints", "environment_files", "deliverables", "notes"],
+  "unevaluatedProperties": false
+}

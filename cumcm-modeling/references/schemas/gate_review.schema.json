@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gate_review.schema.json",
+  "title": "CUMCM human gate review log",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "gate_review"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "gate": {"type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7"]},
+          "decision": {"$ref": "common.schema.json#/$defs/validationStatus"},
+          "basis": {"type": "string", "enum": ["human", "hybrid"]},
+          "reviewer": {"type": "string", "minLength": 1},
+          "reviewed_at": {"type": "string", "format": "date-time"},
+          "rationale": {"type": "string", "minLength": 1},
+          "evidence_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "artifact_fingerprints": {
+            "type": "object",
+            "additionalProperties": {"$ref": "common.schema.json#/$defs/sha256"},
+            "propertyNames": {"$ref": "common.schema.json#/$defs/typedId"}
+          },
+          "conditions": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        },
+        "required": ["id", "gate", "decision", "basis", "reviewer", "reviewed_at", "rationale", "evidence_refs", "artifact_fingerprints", "conditions"]
+      }
+    }
+  },
+  "required": ["reviews"],
+  "unevaluatedProperties": false
+}

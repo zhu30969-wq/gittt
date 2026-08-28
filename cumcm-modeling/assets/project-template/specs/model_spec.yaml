@@ -1,0 +1,40 @@
+schema_version: 1.0.0
+kind: model_spec
+id: model:main
+revision: 1
+lifecycle_status: draft
+depends_on: [problem:main]
+provenance:
+  author_type: human
+extensions: {}
+problem_ref: problem:main
+addresses: [question:q1]
+role: primary
+model_family: descriptive
+assumption_refs: [assumption:a1]
+symbols:
+  - id: symbol:x
+    name: x
+    role: input
+    domain: real
+    shape: scalar
+    unit: "1"
+    definition: "替换为变量的准确含义。"
+formulation:
+  equations: []
+  objectives: []
+  constraints: []
+data_bindings: []
+algorithm:
+  description: "替换为可复核的求解或计算流程。"
+  entrypoint: code/main.py
+  termination: "替换为停止条件或确定性完成条件。"
+  complexity_note: "可选：记录主要时间/空间复杂度或计算预算。"
+validation_plan:
+  methods: ["至少加入一个与题型相适配的验证方法。"]
+  failure_criteria: ["明确什么现象会推翻或限制该模型。"]
+  human_review_required: true
+sensitivity_plan: []
+applicability: "说明模型成立的数据范围、时间范围和对象范围。"
+failure_modes: ["记录至少一种模型可能失效的情形。"]
+fallback_models: []

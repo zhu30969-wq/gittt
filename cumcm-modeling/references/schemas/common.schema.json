@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "CUMCM contract common definitions",
+  "$defs": {
+    "typedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "lifecycleStatus": {
+      "type": "string",
+      "enum": ["draft", "reviewed", "frozen", "stale", "superseded"]
+    },
+    "validationStatus": {
+      "type": "string",
+      "enum": ["PASS", "WARN", "BLOCK", "ENV_BLOCK", "STALE", "NOT_APPLICABLE"]
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"$ref": "#/$defs/typedId"},
+        "pointer": {"type": "string", "pattern": "^(/.*)?$"},
+        "role": {"type": "string", "minLength": 1}
+      },
+      "required": ["ref"]
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 0},
+        "media_type": {"type": "string", "minLength": 1}
+      },
+      "required": ["path", "sha256"]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "author_type": {"type": "string", "enum": ["human", "agent", "script", "mixed"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "source_refs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/typedId"},
+          "uniqueItems": true
+        },
+        "generated_by": {"type": "string", "minLength": 1}
+      },
+      "required": ["author_type"]
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": ["number", "null"]},
+        "unit": {"type": "string", "minLength": 1},
+        "missing_reason": {"type": "string", "minLength": 1}
+      },
+      "required": ["value", "unit"],
+      "allOf": [
+        {
+          "if": {"properties": {"value": {"type": "null"}}},
+          "then": {"required": ["missing_reason"]}
+        }
+      ]
+    },
+    "artifactBase": {
+      "type": "object",
+      "properties": {
+        "$schema": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/typedId"},
+        "revision": {"type": "integer", "minimum": 1},
+        "lifecycle_status": {"$ref": "#/$defs/lifecycleStatus"},
+        "depends_on": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/typedId"},
+          "uniqueItems": true
+        },
+        "provenance": {"$ref": "#/$defs/provenance"},
+        "extensions": {"type": "object"}
+      },
+      "required": ["schema_version", "kind", "id", "revision", "lifecycle_status", "depends_on", "provenance"]
+    }
+  }
+}

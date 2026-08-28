@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "experiment.schema.json",
+  "title": "CUMCM experiment specification",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "experiment"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "model_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "question_refs": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "mode": {"type": "string", "enum": ["exploratory", "confirmatory", "validation"]},
+    "purpose": {"type": "string", "minLength": 1},
+    "hypothesis": {"type": ["string", "null"]},
+    "data_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "code_files": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
+    "environment": {"$ref": "common.schema.json#/$defs/fileRef"},
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "cwd": {"$ref": "common.schema.json#/$defs/relativePath"},
+        "environment_allowlist": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$"}, "uniqueItems": true},
+        "network_access": {"type": "string", "enum": ["not_needed", "required", "unknown"]}
+      },
+      "required": ["argv", "cwd", "environment_allowlist", "network_access"]
+    },
+    "seeds": {"type": "array", "minItems": 1, "items": {"type": "integer"}, "uniqueItems": true},
+    "repetitions": {"type": "integer", "minimum": 1},
+    "parameters": {"type": "object"},
+    "split_strategy": {"type": "string", "minLength": 1},
+    "baseline_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "name": {"type": "string", "minLength": 1},
+          "direction": {"type": "string", "enum": ["minimize", "maximize", "target", "descriptive"]},
+          "unit": {"type": "string", "minLength": 1},
+          "aggregation": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "name", "direction", "unit", "aggregation"]
+      }
+    },
+    "acceptance_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "operator": {"type": "string", "enum": ["==", "!=", "<", "<=", ">", ">="]},
+          "threshold": {"type": "number"},
+          "unit": {"type": "string", "minLength": 1},
+          "registration_timing": {"type": "string", "enum": ["pre_result", "post_result"]},
+          "rationale": {"type": "string", "minLength": 1}
+        },
+        "required": ["metric_ref", "operator", "threshold", "unit", "registration_timing", "rationale"]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+          "required": {"type": "boolean"},
+          "comparator": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {"type": "string", "enum": ["exact_sha256", "json_numeric", "csv_numeric", "existence"]},
+              "absolute_tolerance": {"type": "number", "minimum": 0},
+              "relative_tolerance": {"type": "number", "minimum": 0},
+              "key_columns": {"type": "array", "items": {"type": "string", "minLength": 1}}
+            },
+            "required": ["type"]
+          }
+        },
+        "required": ["id", "path", "required", "comparator"]
+      }
+    },
+    "timeout_seconds": {"type": "integer", "minimum": 1},
+    "resource_note": {"type": "string", "minLength": 1}
+  },
+  "required": ["model_ref", "question_refs", "mode", "purpose", "hypothesis", "data_refs", "code_files", "environment", "command", "seeds", "repetitions", "parameters", "split_strategy", "baseline_refs", "metrics", "acceptance_rules", "outputs", "timeout_seconds", "resource_note"],
+  "unevaluatedProperties": false
+}

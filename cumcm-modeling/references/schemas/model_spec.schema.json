@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model_spec.schema.json",
+  "title": "CUMCM model specification",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/artifactBase"},
+    {
+      "if": {"properties": {"model_family": {"const": "optimization"}}},
+      "then": {
+        "properties": {
+          "formulation": {
+            "required": ["objectives", "constraints"],
+            "properties": {
+              "objectives": {"minItems": 1},
+              "constraints": {"minItems": 1}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "model_spec"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "problem_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "addresses": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "role": {"type": "string", "enum": ["primary", "baseline", "fallback", "diagnostic"]},
+    "model_family": {
+      "type": "string",
+      "enum": ["descriptive", "statistical", "prediction", "optimization", "simulation", "evaluation", "causal", "hybrid", "other"]
+    },
+    "assumption_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "symbols": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "name": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "enum": ["decision", "state", "parameter", "input", "output", "index", "constant"]},
+          "domain": {"type": "string", "minLength": 1},
+          "shape": {"type": "string", "minLength": 1},
+          "unit": {"type": "string", "minLength": 1},
+          "definition": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "name", "role", "domain", "shape", "unit", "definition"]
+      }
+    },
+    "formulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "equations": {"$ref": "#/$defs/formulaList"},
+        "objectives": {"$ref": "#/$defs/formulaList"},
+        "constraints": {"$ref": "#/$defs/formulaList"}
+      },
+      "required": ["equations", "objectives", "constraints"]
+    },
+    "data_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "symbol_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "data_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "field": {"type": "string", "minLength": 1},
+          "transformation": {"type": "string", "minLength": 1}
+        },
+        "required": ["symbol_ref", "data_ref", "field", "transformation"]
+      }
+    },
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {"type": "string", "minLength": 1},
+        "entrypoint": {"$ref": "common.schema.json#/$defs/relativePath"},
+        "termination": {"type": "string", "minLength": 1},
+        "complexity_note": {"type": "string", "minLength": 1}
+      },
+      "required": ["description", "entrypoint", "termination"]
+    },
+    "validation_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "methods": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "failure_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "human_review_required": {"type": "boolean", "const": true}
+      },
+      "required": ["methods", "failure_criteria", "human_review_required"]
+    },
+    "sensitivity_plan": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "applicability": {"type": "string", "minLength": 1},
+    "failure_modes": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "fallback_models": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true}
+  },
+  "$defs": {
+    "formulaList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "expression": {"type": "string", "minLength": 1},
+          "format": {"type": "string", "enum": ["latex", "typst", "plain", "sympy"]},
+          "defines": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "uses": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "interpretation": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "expression", "format", "defines", "uses", "interpretation"]
+      }
+    }
+  },
+  "required": ["problem_ref", "addresses", "role", "model_family", "assumption_refs", "symbols", "formulation", "data_bindings", "algorithm", "validation_plan", "sensitivity_plan", "applicability", "failure_modes", "fallback_models"],
+  "unevaluatedProperties": false
+}

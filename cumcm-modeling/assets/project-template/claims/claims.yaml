@@ -1,0 +1,27 @@
+schema_version: 1.0.0
+kind: claims
+id: claims:main
+revision: 1
+lifecycle_status: draft
+depends_on: [result:main]
+provenance:
+  author_type: human
+extensions: {}
+claims:
+  - id: claim:c1
+    statement: "替换为精确、有边界且可追溯的结论。"
+    claim_type: descriptive
+    epistemic_status: observed
+    publication_status: draft
+    scope: "说明适用的数据、对象与条件。"
+    evidence_refs: []
+    assumption_refs: [assumption:a1]
+    limitations: ["模板结论尚无实验证据，不能进入正式论文。"]
+    counterevidence: []
+    numeric_assertions: []
+    proof_artifact: null
+    paper_markers: []
+    human_review:
+      status: BLOCK
+      reviewer: null
+      rationale: "尚未完成模型与结果人工复核。"

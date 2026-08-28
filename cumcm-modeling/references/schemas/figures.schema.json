@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "figures.schema.json",
+  "title": "CUMCM figure registry",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "figures"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "figures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "provenance_type": {"type": "string", "enum": ["derived", "conceptual", "external"]},
+          "source_result_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "source_files": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
+          "generator_files": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
+          "generator_argv": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "output": {"$ref": "common.schema.json#/$defs/fileRef"},
+          "panels": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "encodings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "field": {"type": "string", "minLength": 1},
+                "aesthetic": {"type": "string", "minLength": 1},
+                "unit": {"type": "string", "minLength": 1}
+              },
+              "required": ["field", "aesthetic", "unit"]
+            }
+          },
+          "axes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {"type": "string", "enum": ["x", "y", "z", "color", "size"]},
+                "label": {"type": "string", "minLength": 1},
+                "unit": {"type": "string", "minLength": 1},
+                "scale": {"type": "string", "enum": ["linear", "log", "symlog", "categorical", "other"]}
+              },
+              "required": ["name", "label", "unit", "scale"]
+            }
+          },
+          "caption": {"type": "string", "minLength": 1},
+          "alt_text": {"type": "string", "minLength": 1},
+          "claim_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "postprocess": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "external_source": {"type": ["string", "null"]},
+          "license": {"type": ["string", "null"]}
+        },
+        "required": ["id", "provenance_type", "source_result_refs", "source_files", "generator_files", "generator_argv", "output", "panels", "encodings", "axes", "caption", "alt_text", "claim_refs", "postprocess", "external_source", "license"],
+        "allOf": [
+          {
+            "if": {"properties": {"provenance_type": {"const": "derived"}}},
+            "then": {"properties": {"source_result_refs": {"minItems": 1}, "generator_files": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"provenance_type": {"const": "external"}}},
+            "then": {"properties": {"external_source": {"type": "string", "minLength": 1}, "license": {"type": "string", "minLength": 1}}}
+          }
+        ]
+      }
+    }
+  },
+  "required": ["figures"],
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,63 @@
+schema_version: 1.0.0
+kind: manifest
+id: manifest:project
+revision: 1
+lifecycle_status: draft
+depends_on: []
+provenance:
+  author_type: human
+extensions: {}
+manifest_type: project
+project_id: __PROJECT_ID__
+competition_profile:
+  enabled: false
+  path: null
+  note: "论文格式 profile 为可配置检查；启用前必须依据当年官方规则人工确认。"
+artifacts:
+  - id: problem:main
+    kind: problem_spec
+    path: specs/problem_spec.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: []
+  - id: model:main
+    kind: model_spec
+    path: specs/model_spec.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [problem:main]
+  - id: experiment:main
+    kind: experiment
+    path: experiments/experiment.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [model:main]
+  - id: result:main
+    kind: results
+    path: results/results.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [experiment:main]
+  - id: claims:main
+    kind: claims
+    path: claims/claims.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [result:main]
+  - id: figures:main
+    kind: figures
+    path: figures/figures.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [result:main, claims:main]
+  - id: review:gates
+    kind: gate_review
+    path: reviews/gate-reviews.yaml
+    sha256: __AUTO_SHA256__
+    required: true
+    depends_on: [problem:main, model:main, experiment:main, result:main, claims:main, figures:main]
+entrypoints: {}
+environment_files: []
+deliverables: []
+notes:
+  - "初始化模板只建立证据链骨架；填入官方题面、数据、代码和结果后才能通过质量门禁。"

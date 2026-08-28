@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claims.schema.json",
+  "title": "CUMCM claim registry",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "claims"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "statement": {"type": "string", "minLength": 1},
+          "claim_type": {
+            "type": "string",
+            "enum": ["descriptive", "comparative", "predictive", "causal", "optimality", "theoretical", "recommendation", "limitation"]
+          },
+          "epistemic_status": {
+            "type": "string",
+            "enum": ["observed", "empirically_supported", "simulation_supported", "analytically_derived", "formally_proved"]
+          },
+          "publication_status": {"type": "string", "enum": ["draft", "final", "unused"]},
+          "scope": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"$ref": "common.schema.json#/$defs/artifactRef"}
+          },
+          "assumption_refs": {
+            "type": "array",
+            "items": {"$ref": "common.schema.json#/$defs/typedId"},
+            "uniqueItems": true
+          },
+          "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "counterevidence": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/artifactRef"}},
+          "numeric_assertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "reported_value": {"type": "number"},
+                "absolute_tolerance": {"type": "number", "minimum": 0},
+                "relative_tolerance": {"type": "number", "minimum": 0},
+                "unit": {"type": "string", "minLength": 1}
+              },
+              "required": ["metric_ref", "reported_value", "absolute_tolerance", "relative_tolerance", "unit"]
+            }
+          },
+          "proof_artifact": {"oneOf": [{"$ref": "common.schema.json#/$defs/fileRef"}, {"type": "null"}]},
+          "paper_markers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "human_review": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {"$ref": "common.schema.json#/$defs/validationStatus"},
+              "reviewer": {"type": ["string", "null"]},
+              "rationale": {"type": "string", "minLength": 1}
+            },
+            "required": ["status", "reviewer", "rationale"]
+          }
+        },
+        "required": ["id", "statement", "claim_type", "epistemic_status", "publication_status", "scope", "evidence_refs", "assumption_refs", "limitations", "counterevidence", "numeric_assertions", "proof_artifact", "paper_markers", "human_review"],
+        "allOf": [
+          {
+            "if": {"properties": {"publication_status": {"const": "final"}}},
+            "then": {"properties": {"evidence_refs": {"minItems": 1}, "paper_markers": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"epistemic_status": {"const": "formally_proved"}}},
+            "then": {"properties": {"proof_artifact": {"$ref": "common.schema.json#/$defs/fileRef"}}}
+          }
+        ]
+      }
+    }
+  },
+  "required": ["claims"],
+  "unevaluatedProperties": false
+}

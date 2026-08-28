@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: cumcm-modeling/scripts/requirements.txt
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r cumcm-modeling/scripts/requirements.txt
+
+      - name: Fetch pinned quick_validate
+        env:
+          QUICK_VALIDATE_URL: https://raw.githubusercontent.com/openai/codex/2c4a95736bea64256a50f7b8506bd33c181cc85a/codex-rs/skills/src/assets/samples/skill-creator/scripts/quick_validate.py
+          QUICK_VALIDATE_SHA256: 1fd66498c219616fd9249eacdf16c458412ea9065a9d887fd716aeef03907762
+        run: |
+          curl --fail --location --silent --show-error \
+            "$QUICK_VALIDATE_URL" \
+            --output "$RUNNER_TEMP/quick_validate.py"
+          printf '%s  %s\n' \
+            "$QUICK_VALIDATE_SHA256" \
+            "$RUNNER_TEMP/quick_validate.py" \
+            | sha256sum --check --strict
+
+      - name: Validate Skill metadata in UTF-8 mode
+        run: python -X utf8 "$RUNNER_TEMP/quick_validate.py" cumcm-modeling
+
+      - name: Compile Python files with py_compile
+        run: |
+          python -X utf8 -m py_compile \
+            cumcm-modeling/scripts/*.py \
+            tests/*.py
+
+      - name: Self-validate JSON Schemas and local references
+        shell: bash
+        run: |
+          python -X utf8 - <<'PY'
+          import json
+          from pathlib import Path
+
+          from jsonschema import Draft202012Validator
+          from referencing import Registry, Resource
+
+          schema_root = Path("cumcm-modeling/references/schemas").resolve()
+          schema_paths = sorted(schema_root.glob("*.schema.json"))
+          required = {
+              "common.schema.json",
+              "manifest.schema.json",
+              "problem_spec.schema.json",
+              "model_spec.schema.json",
+              "experiment.schema.json",
+              "results.schema.json",
+              "claims.schema.json",
+              "figures.schema.json",
+              "gate_review.schema.json",
+          }
+          present = {path.name for path in schema_paths}
+          missing = sorted(required - present)
+          if missing:
+              raise SystemExit(f"missing required schemas: {', '.join(missing)}")
+
+          # Validate each schema against the Draft 2020-12 metaschema first.
+          # Runtime copies receive absolute retrieval URIs so every portable
+          # relative $ref is resolved locally instead of reaching the network.
+          schemas = {}
+          registry = Registry()
+          for path in schema_paths:
+              schema = json.loads(path.read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              schema["$id"] = path.as_uri()
+              schemas[path.name] = schema
+              registry = registry.with_resource(
+                  schema["$id"], Resource.from_contents(schema)
+              )
+
+          def iter_refs(node):
+              if isinstance(node, dict):
+                  reference = node.get("$ref")
+                  if isinstance(reference, str):
+                      yield reference
+                  for value in node.values():
+                      yield from iter_refs(value)
+              elif isinstance(node, list):
+                  for value in node:
+                      yield from iter_refs(value)
+
+          resolved = 0
+          for name, schema in schemas.items():
+              resolver = registry.resolver(base_uri=schema["$id"])
+              for reference in iter_refs(schema):
+                  resolver.lookup(reference)
+                  resolved += 1
+          print(f"Validated {len(schemas)} schemas and {resolved} local references")
+          PY
+
+      - name: Run complete unittest suite
+        run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Positive paper lint
+        run: |
+          python -X utf8 cumcm-modeling/scripts/lint_paper.py \
+            tests/fixtures/paper-pass \
+            --engine latex \
+            --source paper/main.tex \
+            --claims claims/claims.yaml \
+            --figures figures/figures.yaml \
+            --strict
+
+      - name: Negative paper lint must block
+        shell: bash
+        run: |
+          set +e
+          python -X utf8 cumcm-modeling/scripts/lint_paper.py \
+            tests/fixtures/paper-fail \
+            --engine typst \
+            --source paper/main.typ \
+            --strict
+          status=$?
+          set -e
+          if [ "$status" -ne 10 ]; then
+            echo "Expected negative paper lint to exit 10, got $status"
+            exit 1
+          fi
+
+      - name: Build and audit synthetic release fixture
+        shell: bash
+        run: |
+          fixture="$RUNNER_TEMP/cumcm-release-fixture"
+          report="$RUNNER_TEMP/cumcm-release-audit.json"
+          python -X utf8 tests/build_release_fixture.py "$fixture"
+          python -X utf8 cumcm-modeling/scripts/manifest.py "$fixture"
+          python -X utf8 cumcm-modeling/scripts/audit_project.py \
+            "$fixture" \
+            --json-report "$report"
+          AUDIT_REPORT="$report" python -X utf8 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path(os.environ["AUDIT_REPORT"])
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          if report.get("status") != "PASS":
+              raise SystemExit(
+                  f"synthetic release audit must be PASS, got {report.get('status')!r}"
+              )
+          print("Synthetic release audit: PASS")
+          PY
+
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: cumcm-modeling/scripts/requirements.txt
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r cumcm-modeling/scripts/requirements.txt
+
+      - name: Exercise Windows paths and cross-process locks
+        run: >-
+          python -X utf8 -m unittest -v
+          tests.test_path_safety
+          tests.test_write_concurrency

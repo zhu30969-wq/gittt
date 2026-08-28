@@ -1,0 +1,25 @@
+# Python bytecode and test/tool caches.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local Python environments and secrets.
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Persistent writer sidecars are runtime coordination state, not artifacts.
+.*.lock
+
+# Operating-system metadata.
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini

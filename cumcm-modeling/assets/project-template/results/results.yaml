@@ -1,0 +1,40 @@
+schema_version: 1.0.0
+kind: results
+id: result:main
+revision: 1
+lifecycle_status: draft
+depends_on: [experiment:main]
+provenance:
+  author_type: script
+  generated_by: "尚未运行；成功运行后由结果记录流程重写本文件。"
+extensions: {}
+experiment_ref: experiment:main
+run_status: partial
+fingerprints:
+  experiment:main: "0000000000000000000000000000000000000000000000000000000000000000"
+run:
+  run_id: run:unexecuted
+  started_at: "2026-01-01T00:00:00Z"
+  finished_at: "2026-01-01T00:00:00Z"
+  argv: [python, code/main.py]
+  cwd: .
+  exit_code: 1
+  seeds: [2026]
+  platform: UNSET
+  git_commit: null
+  git_dirty: null
+  environment_note: "尚未执行。"
+inputs: []
+outputs: []
+metrics:
+  - metric_ref: metric:primary
+    measurement:
+      value: null
+      unit: "1"
+      missing_reason: "尚未执行实验。"
+    sample_size: 0
+    uncertainty: null
+diagnostics: []
+warnings: ["模板占位结果不能用于论文结论。"]
+failure_reason: "尚未执行实验。"
+logs: []

@@ -1,0 +1,37 @@
+schema_version: 1.0.0
+kind: problem_spec
+id: problem:main
+revision: 1
+lifecycle_status: draft
+depends_on: []
+provenance:
+  author_type: human
+extensions: {}
+contest:
+  name: 全国大学生数学建模竞赛
+  year: 2026
+  problem_code: UNSET
+statement:
+  path: inputs/problem-statement.pdf
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  language: zh-CN
+questions:
+  - id: question:q1
+    text: "替换为第一问的准确任务描述。"
+    task_type: other
+    required_outputs: [deliverable:q1]
+    evaluation_intent: "说明如何判断这一问是否被完整回答。"
+data_assets: []
+assumptions:
+  - id: assumption:a1
+    text: "替换为明确假设；不要把题面给定条件误记为自设假设。"
+    basis: simplifying
+    impact: "说明假设影响的模型范围和潜在偏差。"
+    check: "说明敏感性检查或人工论证方法。"
+ambiguities: []
+constraints: []
+deliverables:
+  - id: deliverable:q1
+    description: "第一问对应的模型、结果和解释。"
+    question_refs: [question:q1]
+out_of_scope: []

@@ -1,0 +1,48 @@
+schema_version: 1.0.0
+kind: experiment
+id: experiment:main
+revision: 1
+lifecycle_status: draft
+depends_on: [model:main]
+provenance:
+  author_type: human
+extensions: {}
+model_ref: model:main
+question_refs: [question:q1]
+mode: exploratory
+purpose: "替换为本实验要回答的问题。"
+hypothesis: null
+data_refs: []
+code_files:
+  - path: code/main.py
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+environment:
+  path: requirements.txt
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+command:
+  argv: [python, code/main.py]
+  cwd: .
+  environment_allowlist: []
+  network_access: unknown
+seeds: [2026]
+repetitions: 1
+parameters: {}
+split_strategy: "不适用时说明原因；预测任务必须写明时间或样本切分。"
+baseline_refs: []
+metrics:
+  - id: metric:primary
+    name: primary_metric
+    direction: descriptive
+    unit: "1"
+    aggregation: "说明聚合方法。"
+acceptance_rules: []
+outputs:
+  - id: output:primary
+    path: outputs/result.json
+    required: true
+    comparator:
+      type: json_numeric
+      absolute_tolerance: 0.0
+      relative_tolerance: 0.0
+timeout_seconds: 600
+resource_note: "记录预计运行环境和资源需求。"

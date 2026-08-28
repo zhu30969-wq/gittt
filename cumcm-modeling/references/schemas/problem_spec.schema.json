@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "problem_spec.schema.json",
+  "title": "CUMCM problem specification",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "problem_spec"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "contest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "year": {"type": "integer", "minimum": 1992},
+        "problem_code": {"type": "string", "minLength": 1},
+        "rules": {"$ref": "common.schema.json#/$defs/fileRef"},
+        "format_profile": {"$ref": "common.schema.json#/$defs/relativePath"}
+      },
+      "required": ["name", "year", "problem_code"]
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+        "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 0},
+        "media_type": {"type": "string", "minLength": 1},
+        "language": {"type": "string", "minLength": 1}
+      },
+      "required": ["path", "sha256", "language"]
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "text": {"type": "string", "minLength": 1},
+          "task_type": {
+            "type": "string",
+            "enum": ["description", "prediction", "evaluation", "optimization", "mechanism", "decision", "other"]
+          },
+          "required_outputs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "common.schema.json#/$defs/typedId"},
+            "uniqueItems": true
+          },
+          "evaluation_intent": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "text", "task_type", "required_outputs", "evaluation_intent"]
+      }
+    },
+    "data_assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "availability": {"type": "string", "enum": ["bundled", "external", "generated"]},
+          "file": {"$ref": "common.schema.json#/$defs/fileRef"},
+          "source": {"type": "string", "minLength": 1},
+          "license": {"type": "string", "minLength": 1},
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "definition": {"type": "string", "minLength": 1},
+                "unit": {"type": "string", "minLength": 1}
+              },
+              "required": ["name", "definition", "unit"]
+            }
+          }
+        },
+        "required": ["id", "availability", "source", "license"],
+        "allOf": [
+          {
+            "if": {"properties": {"availability": {"const": "bundled"}}},
+            "then": {"required": ["file"]}
+          }
+        ]
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "text": {"type": "string", "minLength": 1},
+          "basis": {"type": "string", "enum": ["given", "inferred", "simplifying"]},
+          "impact": {"type": "string", "minLength": 1},
+          "check": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "text", "basis", "impact", "check"]
+      }
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "text": {"type": "string", "minLength": 1},
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+          "status": {"type": "string", "enum": ["open", "resolved", "branched"]},
+          "handling": {"type": "string", "minLength": 1},
+          "impact": {"type": "string", "minLength": 1}
+        },
+        "required": ["id", "text", "severity", "status", "handling", "impact"]
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "text": {"type": "string", "minLength": 1},
+          "hard": {"type": "boolean"}
+        },
+        "required": ["id", "text", "hard"]
+      }
+    },
+    "deliverables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "description": {"type": "string", "minLength": 1},
+          "question_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "common.schema.json#/$defs/typedId"}
+          }
+        },
+        "required": ["id", "description", "question_refs"]
+      }
+    },
+    "out_of_scope": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "required": ["contest", "statement", "questions", "data_assets", "assumptions", "ambiguities", "constraints", "deliverables", "out_of_scope"],
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,4 @@
+claims:
+  - id: claim:c1
+    publication_status: final
+    paper_markers: ["claim:c1"]

@@ -1,0 +1,38 @@
+# Normalize repository text files to LF. Source files are authored as UTF-8.
+* text=auto
+
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.ipynb text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.txt text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.tex text eol=lf
+*.typ text eol=lf
+*.bib text eol=lf
+*.toml text eol=lf
+*.svg text eol=lf
+
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.npy binary
+*.npz binary
+*.mat binary
+*.parquet binary
+*.feather binary

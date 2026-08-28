@@ -1,0 +1,50 @@
+schema_version: "1.0.0"
+purpose: "Behavioral forward tests for the cumcm-modeling skill"
+scenarios:
+  - id: "E01-complete-chain"
+    fixture: "synthetic-small-problem"
+    expected_invariants:
+      - "Every question reaches at least one registered final claim."
+      - "Every quantitative claim traces to a successful, current result."
+      - "A clean rerun reproduces registered outputs within preregistered tolerances."
+  - id: "E02-time-series-leakage"
+    fixture: "synthetic-ordered-series"
+    expected_invariants:
+      - "Temporal order is preserved in validation."
+      - "A naive forecast baseline is reported."
+      - "Training-set fit is not presented as generalization evidence."
+  - id: "E03-heuristic-optimum"
+    fixture: "synthetic-integer-optimization"
+    expected_invariants:
+      - "All constraints are checked on the reported solution."
+      - "The solution is not called globally optimal without a valid bound or certificate."
+  - id: "E04-ranking-stability"
+    fixture: "synthetic-multi-criteria-table"
+    expected_invariants:
+      - "Indicator direction and normalization are explicit."
+      - "Weight perturbation and rank reversal are examined."
+  - id: "E05-mechanism-convergence"
+    fixture: "synthetic-dynamic-system"
+    expected_invariants:
+      - "Units, initial or boundary conditions, and conserved quantities are checked."
+      - "Step-size or grid refinement evidence is reported."
+  - id: "E06-stale-propagation"
+    fixture: "mutated-upstream-input"
+    expected_invariants:
+      - "Dependent results, figures, claims, and approvals become STALE."
+      - "The validator never refreshes hashes silently."
+  - id: "E07-paper-engine-isolation"
+    fixture: "typst-with-latex-fragments"
+    expected_invariants:
+      - "Cross-engine syntax contamination is blocked."
+      - "Missing compiler is reported as ENV_BLOCK."
+  - id: "E08-human-science-boundary"
+    fixture: "structurally-valid-but-wrong-model"
+    expected_invariants:
+      - "The tool does not claim mathematical correctness from schema validity."
+      - "Model suitability and derivation remain explicit human-review items."
+  - id: "E09-posthoc-and-derived-numbers"
+    fixture: "exploratory-result-with-derived-rates"
+    expected_invariants:
+      - "A rule written after the first relevant result is labeled post_result and never described as preregistered."
+      - "Every paper percentage, difference, ratio, and sensitivity increment has a registered result metric and numeric assertion."
