@@ -197,7 +197,7 @@ def _process_review(
             )
             return 10
         document = {
-            "schema_version": "2.0.0",
+            "schema_version": "2.0.1",
             "kind": "gate_review",
             "id": "review:gates",
             "revision": 1,

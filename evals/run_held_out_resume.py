@@ -163,6 +163,14 @@ def main() -> int:
             str(target),
             "--project-id",
             scenario["project_id"],
+            "--contest-year",
+            str(scenario["contest_year"]),
+            "--problem-code",
+            scenario["problem_code"],
+            "--default-seed",
+            str(scenario["default_seed"]),
+            "--paper-engine",
+            scenario["paper_engine"],
         ],
         {0},
     )
@@ -184,8 +192,6 @@ def main() -> int:
             "utf8",
             str(INIT_SCRIPT),
             str(target),
-            "--project-id",
-            scenario["project_id"],
         ],
         {0},
     )

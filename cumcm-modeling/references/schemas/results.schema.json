@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "results.schema.json",
   "title": "CUMCM experiment results",
+  "$comment": "Contract 2.0.1 permits an unexecuted ordinary partial result to use null/null timestamps. Success, failed, and actual promotion-trigger partial runs still require a real, ordered time interval through audit_project.py semantic validation.",
   "allOf": [
     {"$ref": "common.schema.json#/$defs/artifactBase"},
     {
@@ -43,8 +44,18 @@
       "additionalProperties": false,
       "properties": {
         "run_id": {"$ref": "common.schema.json#/$defs/typedId"},
-        "started_at": {"type": "string", "format": "date-time"},
-        "finished_at": {"type": "string", "format": "date-time"},
+        "started_at": {
+          "oneOf": [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"}
+          ]
+        },
+        "finished_at": {
+          "oneOf": [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"}
+          ]
+        },
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "cwd": {"$ref": "common.schema.json#/$defs/relativePath"},
         "exit_code": {"type": "integer"},

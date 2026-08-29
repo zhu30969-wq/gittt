@@ -1,6 +1,6 @@
 ---
 name: cumcm-modeling
-description: "Solve, continue, or audit China Undergraduate Mathematical Contest in Modeling (CUMCM/全国大学生数学建模竞赛/国赛) projects, including problem framing, model design, code and experiments, validation, figures, Chinese papers, and three-person handoffs. Use when the user explicitly names CUMCM/国赛 or supplies an identifiable CUMCM problem/project; do not use for COMAP MCM/ICM, generic math homework, or unrelated data analysis."
+description: "Orchestrate, continue, or audit CUMCM（全国大学生数学建模竞赛，简称国赛） projects with problem framing, baseline-aware modeling, reproducible experiments, traceable claims, figures, Chinese papers, three-person handoffs, and paper QA. Use for explicit CUMCM/全国大学生数学建模竞赛/国赛 tasks; do not use for COMAP MCM/ICM, generic homework, or unrelated data analysis."
 ---
 
 # CUMCM 数学建模
@@ -9,19 +9,14 @@ description: "Solve, continue, or audit China Undergraduate Mathematical Contest
 
 ## 先确定工作方式
 
-根据请求选择一种方式，不要强迫局部任务运行完整流水线：
+按请求选择一种方式；具体映射和切换条件见 [工作方式](references/profiles.md)：
 
-- **完整推进**：从题面和附件开始，依次完成建模、实验、验证和论文。
-- **续做项目**：先读取现有状态、产物和散列，只从下一个合法状态继续；不得重新初始化或覆盖已经确认的工作。
-- **聚焦阶段**：只完成用户点名的题意分析、模型设计、代码、验证、图表或论文阶段，并明确缺失的上游依据。
-- **审计评审**：默认只读，给出证据化问题、严重度和应回退的阶段；只有用户同时要求修复时才编辑。
+- `focused`：只完成用户点名阶段，不强制初始化或伪造门禁。
+- `competition-fast`：使用 `project`/`run` 语义做限时迭代；缺审批的 `WARN` 不等于通过或可提交。
+- `release-strict`：使用 `release` 语义和完整 G0–G7；只有此模式可到 `SUBMISSION_READY`。
+- `audit`：默认只读，报告证据、根因、失效传播和回退；用户明确要求后才修复。
 
-再记录运行模式：
-
-- **训练模式**允许更宽的候选比较、盲评、反事实实验和赛后复盘。
-- **正式赛模式**以截止时间、阶段冻结和完整交付为优先，达到可靠基线后再增加复杂度。
-
-两种模式采用相同的建模、验证和证据标准；正式赛模式只调整时间和交付节奏，不降低可用能力。
+续做任何已有项目时，先读取现有状态、产物和散列，只从 `next_legal_action` 继续；不得重新初始化或覆盖已确认工作。
 
 ## 启动检查
 
@@ -45,47 +40,28 @@ description: "Solve, continue, or audit China Undergraduate Mathematical Contest
 - **条件性验证。** 预测、优化、排序评价、机理仿真和随机算法采用各自适用的检查，不能用一张通用敏感性图代替验证。
 - **验证计划必须可执行。** 每项题型风险使用稳定 check ID、适用性、通过规则和失败响应；成功运行必须产生一对一 diagnostic，数值阈值由审计器重新计算。
 - **人不能被 Agent 代签。** Agent 可以生成待审批记录，但只有明确的人类确认才能把门禁标为通过。
-- **release 使用三人多签 approval set。** 不同成员必须以稳定 `member_id` 对同一证据快照签核；G7 共同绑定当前 `snapshot:release`，单人 PASS 不能冻结发布包。
+- **release 必须满足真实人工会签。** Agent 不得代签；具体成员、角色、approval set 和发布快照规则只以 [工作流](references/workflow.md) 与 [团队协作](references/team-collaboration.md) 为准。
 - **上游变化使下游证据失效。** 标记旧产物为过期并保留历史，不静默复用，也不批量删除。
-- **备用路线通过不可变事件晋升。** 不改写旧主模型或条件 fallback；以绑定原路线、fallback、partial 触发结果及当前指纹的 `model_promotion` 记录切换。partial 结果只有在运行、输入输出、指标、完整诊断集、指纹和接受规则全部通过，且仅有预声明触发项 BLOCK 时才能控制路线；它不能支持最终结论。一个 fallback 只能由一个不可变事件激活，晋升后必须重新运行并产生 eligible result。
+- **备用路线不得改写历史。** fallback 切换使用独立、不可变的晋升事件；触发、指纹和重跑规则见 [产物契约](references/contracts.md)。
 - **不把案例当答案。** 案例用于发现可迁移结构和缺陷；当前题目的数据、机制和验证结果始终优先。
 - **结论按证据分级。** 区分“非常确定”“需验证”“推测”，并说明分级依据。
 
-## 单入口状态机
+## 状态与门禁
 
-完整路径只有一个入口：
-
-~~~text
-INTAKE → WAIT_G0
-  → FRAMING → WAIT_G1
-  → MODELING → WAIT_G2
-  → EXPERIMENT_DESIGN → WAIT_G3
-  → COMPUTING → VALIDATING → WAIT_G4
-  → CLAIMING → WAIT_G5
-  → WRITING → FINAL_QA → WAIT_G6
-  → RELEASE_QA → WAIT_G7
-  → SUBMISSION_READY
-~~~
-
-验证失败必须按原因回退：
-
-- 题意、单位、字段或数据定义错误：回到 FRAMING。
-- 假设、变量、目标、约束或模型结构错误：回到 MODELING。
-- 实现、求解器、实验或绘图错误：回到 COMPUTING。
-- 只有表述、排版或引用错误：回到 WRITING。
-
-八个人工门禁依次确认输入、题意、模型、实验、结果、结论与图表、论文、发布包。门禁内容和散列失效规则见 [工作流](references/workflow.md)；三人签核与交接见 [团队协作](references/team-collaboration.md)。
+完整 G0–G7 release 控制只在 `release-strict` 工作中应用。单入口状态、G0–G7 定义、project/run 与 release 的门禁分层、角色要求、回退和失效传播统一由 [工作流](references/workflow.md) 定义。`focused` 不补造完整状态，`competition-fast` 不能把 `WARN` 解释为门禁通过，`release-strict` 只有完整 release 审计才能达到 `SUBMISSION_READY`。
 
 ## 按需读取参考文件
 
+- 选择 `focused`、`competition-fast`、`release-strict` 或 `audit`：读取 [工作方式](references/profiles.md)。
 - 新建、续做、回退或查询状态：读取 [工作流](references/workflow.md)。
 - 创建或检查项目文件、ID、散列与追溯关系：读取 [产物契约](references/contracts.md)。
 - 形成候选模型或判断是否套模：读取 [模型选择](references/model-selection.md)。
-- 使用历年题目、优秀论文或案例元数据：读取 [案例使用](references/case-use.md)。除非请求本身是案例比较，否则先保存独立的问题结构和初步候选，再检索案例。
+- 使用历年题目、优秀论文或案例元数据：读取 [案例使用](references/case-use.md)。只有案例检索或比较任务才读取 `references/cases/`。
 - 编写代码、运行实验、检查结果可信度：读取 [验证规范](validation.md)。
 - 组织三人分工、交接、冲突解决或审批：读取 [团队协作](references/team-collaboration.md)。
 - 阶段评审、质量评分或决定是否前进：读取 [能力量表](references/rubric.md)。
 - 写作、编译、图表和最终 PDF：读取 [论文交付](references/paper-delivery.md)。
+- 起草、压缩或审计摘要：在论文证据稳定后读取 [摘要专项指南](references/abstract.md)。
 - 只有在测试或迭代本 Skill 本身时读取 [独立前向测试](references/forward-testing.md)；解决具体赛题时不要加载。
 
 只读取当前阶段相关的知识分支。不要因为看到“预测”“评价”或“优化”等词，就加载并套用整套算法目录。
@@ -98,8 +74,7 @@ INTAKE → WAIT_G0
 - acceptance rule 必须记录 `registration_timing`。看到相关结果后才形成的规则只能标为 `post_result`，不得在论文中称为“预先”“预注册”或当作确认性检验；若需确认，应建立新的 confirmatory experiment 再运行。
 - 同一确定性技术错误可修复后重试；同一根因连续出现两次，或修改会影响已冻结解释和模型时，停止自动迭代并请求人工判断。
 - 声明 baseline 时必须实际建立同子问、同指标口径的实验与 eligible result；主结果必须绑定所采用的 baseline result，不能只在文字中写“优于基线”。
-- release 中每个支持结论的实验 `code_files` 都必须作为 required code deliverable 交付；只交入口脚本而遗漏其辅助模块不能通过。
-- 理论证明必须是可读取、哈希一致且人工复核的结构化论证：显式绑定 claim ID 与登记命题，包含推理步骤和结论；`formally_proved` 的复核回执还要绑定准确 proof SHA-256。PDF 必须有可提取文本。证明必须进入经实际构建收据/recorder 验证的源码资源闭包或 required appendix；单词、空白页或仅在收据中手填但编译器未消费的路径不能替代计算证据。
+- release 的代码闭包、证明包装、构建收据、LaTeX recorder 和最终 PDF 规则按需读取 [产物契约](references/contracts.md) 与 [论文交付](references/paper-delivery.md)，不要在入口重复维护。
 - 时间不足时优先保证：题意正确、基线可运行、核心结果经验证、结论可追溯、论文完整。不得用新增算法挤占验证和交付时间。
 - 局部任务完成后，说明哪些结论依赖尚未提供的上游材料；不要把局部完成写成全项目通过。
 - 发布前必须交付已哈希且可读取的最终 PDF，并让 G6/G7 人工复核绑定它；只有 `.tex`/`.typ` 源码不能标记为 submission ready。

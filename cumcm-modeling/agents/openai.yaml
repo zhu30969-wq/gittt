@@ -1,4 +1,4 @@
 interface:
   display_name: "CUMCM Modeling"
-  short_description: "Auditable CUMCM modeling workflow"
-  default_prompt: "Use $cumcm-modeling to choose the right mode for this CUMCM task and, for a complete project, produce runnable models, validated results, traceable claims, figures, and a checked paper."
+  short_description: "Orchestrate and audit traceable CUMCM projects"
+  default_prompt: "Use $cumcm-modeling to choose focused, competition-fast, release-strict, or audit mode for this CUMCM task and continue from the current evidence."

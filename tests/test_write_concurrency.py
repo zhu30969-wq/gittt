@@ -318,6 +318,8 @@ class WriteConcurrencyTests(unittest.TestCase):
                 str(root),
                 "--project-id",
                 "project:concurrency-test",
+                "--contest-year",
+                "2026",
             ]
         )
         self.assertEqual(init_code, 0, init_report)

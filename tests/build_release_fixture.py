@@ -111,7 +111,21 @@ def main() -> int:
         return 10
 
     init = subprocess.run(
-        [sys.executable, str(SCRIPTS / "init_project.py"), str(target), "--project-id", "project:synthetic-release"],
+        [
+            sys.executable,
+            str(SCRIPTS / "init_project.py"),
+            str(target),
+            "--project-id",
+            "project:synthetic-release",
+            "--contest-year",
+            "2026",
+            "--problem-code",
+            "SYNTHETIC",
+            "--default-seed",
+            "2026",
+            "--paper-engine",
+            "latex",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -365,7 +379,7 @@ def main() -> int:
     save_yaml(target, "figures/figures.yaml", figures)
 
     paper_build = {
-        "schema_version": "2.0.0",
+        "schema_version": "2.0.1",
         "kind": "paper_build",
         "id": "build:paper",
         "revision": 1,

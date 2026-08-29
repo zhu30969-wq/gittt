@@ -11,10 +11,15 @@ python -m pip install -r scripts/requirements.txt
 初始化新项目：
 
 ```bash
-python scripts/init_project.py ./work --project-id project:cumcm-2026-a
+python scripts/init_project.py ./work \
+  --project-id project:cumcm-2026-a \
+  --contest-year 2026 --problem-code A \
+  --default-seed 42 --paper-engine latex
 ```
 
-初始化器只创建缺失文件。目标文件已存在时返回 `NOT_APPLICABLE`，不会覆盖、合并或刷新其内容。模板中的题面、代码、环境和结果是明确的占位内容，填写并重新锁定 manifest 前，审计出现 `BLOCK` 或 `STALE` 是预期行为。
+新项目必须显式提供 `--contest-year`，初始化器不会从当前日期或项目 ID 猜测年份。`--problem-code`、`--default-seed` 和 `--paper-engine` 分别默认使用 `UNSET`、`42` 和 `latex`，并记录在 `manifest.extensions.initialization`；种子不再与年份绑定。初始化器只创建缺失文件。完整目标无参数重复调用时，顶层 `status` 返回 `PASS`、退出码为 `0`，每个已存在文件的 finding 为 `NOT_APPLICABLE`，且不会覆盖、合并或刷新任何已有文件。初始化相关的五类拒绝都发生在写入之前且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数没有现有记录且没有缺失模板会真实消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源不一致时返回 `EXISTING_INITIALIZATION_INVALID`。旧项目若缺少模板文件且没有保存所需初始化值，应显式补充参数；只有真实包含相应占位符的缺失文件才会消费该参数。当前模板生成 `2.0.1` 契约；合法 `2.x.x`（包括 `2.0.0`）仍可读取、重复初始化和审计，no-op 不自动迁移或改写旧版本，`1.x` 仍不受支持。
+
+模板中的题面、代码、环境和结果是明确占位内容。未执行的普通 partial 结果可用 `started_at: null` 与 `finished_at: null`，不伪造运行时间；success、failed 和实际 promotion-trigger partial 必须记录真实且有序的时间区间。填写并重新锁定 manifest 前，审计出现 `BLOCK` 或 `STALE` 是预期行为。
 
 查看 manifest 与当前文件的差异，或在明确确认后刷新其顶层 artifact 哈希：
 
@@ -50,12 +55,16 @@ lint 检查占位符、跨引擎语法污染、危险 LaTeX shell escape、缺�
 
 ```bash
 python scripts/record_gate_review.py ./work \
-  --gate G2 --decision PASS --reviewer "reviewer-name" \
+  --gate G2 --decision PASS \
+  --approval-set-id approval:g2-r1 \
+  --member-id member:modeler --reviewer "reviewer-name" \
   --rationale "已逐项核对符号、模型假设、推导和适用范围" \
   --evidence model:main --fingerprint model:main=<sha256>
 ```
 
 该脚本执行显式的追加操作，保留原有 review，采用临时文件完成原子替换，并检查可选的期望文件哈希以避免并发覆盖。
+
+`--reviewer` 只与 `team_members[].display_name` 做字符串对照；`--member-id` 和角色也只核对 review 契约中的声明。该脚本不提供密码学身份认证，只记录可追责、可复核且绑定证据指纹的签核信息。Agent 不得自行把未经人类明确确认的 review 写成 `PASS`。最终防线仍是人类读取 `reviews`、对应证据和签核上下文，确认记录确实代表签核者本人判断。
 
 ## 门禁定义
 
@@ -136,6 +145,6 @@ BLOCK > ENV_BLOCK > STALE > WARN > PASS > NOT_APPLICABLE
 16. 支持 release 证据的实验遗漏任一辅助 `code_files` deliverable 时 `BLOCK`。
 17. LaTeX/Typst 构建日志含明确 compiler failure 时不得出现 `PAPER_BUILD_RECEIPT_VERIFIED`。
 18. 纯证明 release 使用单词、未绑定 claim ID/命题的文本，或 `formally_proved` 回执未绑定证明 SHA-256 时 `BLOCK`。
-17. JSON/YAML 出现重复键、NaN、Infinity 或递归别名，旧版 1.x 模板/manifest 试图被刷新，或 release 改用非 bundled Schema 根目录时 `BLOCK` 且不得修改目标文件。
+19. JSON/YAML 出现重复键、NaN、Infinity 或递归别名，旧版 1.x 模板/manifest 试图被刷新，或 release 改用非 bundled Schema 根目录时 `BLOCK` 且不得修改目标文件。
 
 独立前向测试应让未参与设计的 agent 只看到 skill、真实请求和原始材料；评价实际 artifact 和门禁行为，不匹配固定措辞，也不提前泄露陷阱。

@@ -2678,6 +2678,36 @@ class Audit:
             trigger_binding = self.promotion_trigger_diagnostics.get(str(result_id))
             trigger_partial = result.get("run_status") == "partial" and trigger_binding is not None
             execution_complete = successful or trigger_partial
+            run = result.get("run", {})
+            started: datetime | None = None
+            finished: datetime | None = None
+            time_valid = True
+            started_value = run.get("started_at")
+            finished_value = run.get("finished_at")
+            requires_timestamps = result.get("run_status") in {"success", "failed"} or trigger_partial
+
+            # Placeholder partial results may use a null/null pair.  Any actual
+            # success, failure or promotion-trigger execution must bind a real
+            # interval, while a half-populated interval is invalid for every
+            # status because it cannot be interpreted deterministically.
+            try:
+                if (started_value is None) != (finished_value is None):
+                    raise ValueError("started_at and finished_at must both be null or both be timestamps")
+                if started_value is None:
+                    if requires_timestamps:
+                        raise ValueError(f"{result.get('run_status')} run requires started_at and finished_at")
+                else:
+                    started = parse_rfc3339(started_value)
+                    finished = parse_rfc3339(finished_value)
+                    if finished < started:
+                        raise ValueError("finished_at precedes started_at")
+                    if finished > datetime.now(timezone.utc) + MAX_CLOCK_SKEW:
+                        raise ValueError("finished_at is implausibly in the future")
+            except ValueError as exc:
+                self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
+                eligible = False
+                time_valid = False
+
             model = models_by_id.get(experiment.get("model_ref"))
             if model is None:
                 self.add("G4", "BLOCK", "RESULT_MODEL_MISSING", f"{result_id} experiment model does not resolve", artifact_id=result_id)
@@ -2715,7 +2745,6 @@ class Audit:
                 self.result_eligibility[result_id] = False
                 continue
 
-            run = result.get("run", {})
             if run.get("argv") != experiment.get("command", {}).get("argv"):
                 self.add("G4", "BLOCK", "RUN_ARGV_MISMATCH", f"{result_id} argv differs from its experiment", artifact_id=result_id)
                 eligible = False
@@ -2750,33 +2779,30 @@ class Audit:
                     artifact_id=result_id,
                 )
                 eligible = False
-            try:
-                started = parse_rfc3339(run.get("started_at"))
-                finished = parse_rfc3339(run.get("finished_at"))
-                if finished < started:
-                    raise ValueError("finished_at precedes started_at")
-                if finished > datetime.now(timezone.utc) + MAX_CLOCK_SKEW:
-                    raise ValueError("finished_at is implausibly in the future")
-                promotion_event = self.promoted_model_events.get(str(model.get("id"))) if isinstance(model, dict) else None
-                if promotion_event is not None:
-                    event_id, promoted_at = promotion_event
-                    if event_id not in experiment.get("depends_on", []):
-                        raise ValueError("promoted-route experiment does not depend on its promotion event")
-                    if started < promoted_at:
-                        raise ValueError("run started before its fallback route was promoted")
-                timeout_seconds = experiment.get("timeout_seconds")
-                if isinstance(timeout_seconds, int) and (finished - started).total_seconds() > timeout_seconds:
-                    self.add(
-                        "G4",
-                        "BLOCK",
-                        "RUN_TIMEOUT_EXCEEDED",
-                        f"{result_id} elapsed time exceeds the predeclared {timeout_seconds}s budget",
-                        artifact_id=result_id,
-                    )
+            if time_valid and started is not None and finished is not None:
+                try:
+                    # Promotion and timeout checks are meaningful only after a
+                    # complete, valid execution interval has been established.
+                    promotion_event = self.promoted_model_events.get(str(model.get("id"))) if isinstance(model, dict) else None
+                    if promotion_event is not None:
+                        event_id, promoted_at = promotion_event
+                        if event_id not in experiment.get("depends_on", []):
+                            raise ValueError("promoted-route experiment does not depend on its promotion event")
+                        if started < promoted_at:
+                            raise ValueError("run started before its fallback route was promoted")
+                    timeout_seconds = experiment.get("timeout_seconds")
+                    if isinstance(timeout_seconds, int) and (finished - started).total_seconds() > timeout_seconds:
+                        self.add(
+                            "G4",
+                            "BLOCK",
+                            "RUN_TIMEOUT_EXCEEDED",
+                            f"{result_id} elapsed time exceeds the predeclared {timeout_seconds}s budget",
+                            artifact_id=result_id,
+                        )
+                        eligible = False
+                except ValueError as exc:
+                    self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
                     eligible = False
-            except ValueError as exc:
-                self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
-                eligible = False
 
             if execution_complete:
                 if run.get("exit_code") != 0:

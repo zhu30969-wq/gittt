@@ -118,13 +118,17 @@ cumcm-modeling/
 ├── agents/openai.yaml
 ├── assets/project-template/
 ├── references/
+│   ├── profiles.md
 │   ├── contracts.md
 │   ├── workflow.md
 │   ├── model-selection.md
 │   ├── case-use.md
+│   ├── cases/
+│   │   └── _TEMPLATE.md
 │   ├── team-collaboration.md
 │   ├── rubric.md
 │   ├── paper-delivery.md
+│   ├── abstract.md
 │   ├── forward-testing.md
 │   └── schemas/
 ├── scripts/
@@ -141,6 +145,7 @@ tests/
 ├── test_audit_snapshot_security.py
 ├── test_build_and_proof_receipts.py
 ├── test_contract_parsing.py
+├── test_initialization_and_run_times.py
 ├── test_lint_regressions.py
 ├── test_lock_sidecar_security.py
 ├── test_path_safety.py
@@ -257,16 +262,18 @@ cp -R ./cumcm-modeling "$destination"
 
 ~~~bash
 python -X utf8 cumcm-modeling/scripts/init_project.py ./work/cumcm-a \
-  --project-id project:cumcm-2026-a
+  --project-id project:cumcm-2026-a \
+  --contest-year 2026 --problem-code A \
+  --default-seed 42 --paper-engine latex
 ~~~
 
-初始化器只创建缺失文件，不覆盖已有目标。新模板包含明确占位内容；填入真实题面、模型、运行和审批前，审计返回 BLOCK 或 STALE 属于正常结果。
+初始化器只创建缺失文件，不覆盖已有目标。新项目必须显式提供 `--contest-year`，不会从系统时间或项目 ID 猜测年份；问题代码、默认种子和论文引擎也会写入初始化记录。完整项目无参数重复调用时顶层返回 PASS、退出码为 0，每个已有文件的 finding 为 NOT_APPLICABLE，且文件字节保持不变。初始化相关的五类拒绝都会在写入前发生且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数无法从现有记录核验且没有缺失文件会消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源互相矛盾时返回 `EXISTING_INITIALIZATION_INVALID`。当前模板新建的契约版本为 `2.0.1`；读取与审计继续接受合法 `2.x.x`（包括旧 `2.0.0`），重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 仍须先迁移。新模板包含明确占位内容；未执行的普通 partial 允许 `started_at`/`finished_at` 为 `null`/`null`，success、failed 与实际 promotion-trigger partial 仍须通过语义审计绑定真实且有序的时间区间。填入真实题面、模型、运行和审批前，审计返回 BLOCK 或 STALE 属于正常结果。
 
 只查看将要创建的内容：
 
 ~~~bash
 python -X utf8 cumcm-modeling/scripts/init_project.py ./work/cumcm-a \
-  --project-id project:cumcm-2026-a --dry-run
+  --project-id project:cumcm-2026-a --contest-year 2026 --dry-run
 ~~~
 
 ### 2. 只读审计

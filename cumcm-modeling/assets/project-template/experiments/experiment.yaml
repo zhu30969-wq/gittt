@@ -1,4 +1,4 @@
-schema_version: 2.0.0
+schema_version: 2.0.1
 kind: experiment
 id: experiment:main
 revision: 1
@@ -24,7 +24,7 @@ command:
   cwd: .
   environment_allowlist: []
   network_access: unknown
-seeds: [2026]
+seeds: [__DEFAULT_SEED__]
 repetitions: 1
 parameters: {}
 split_strategy: "不适用时说明原因；预测任务必须写明时间或样本切分。"

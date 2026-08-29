@@ -131,6 +131,138 @@ jobs:
       - name: Run complete unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
 
+      - name: Verify initializer CLI refusal and conflict preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing_year_target="$RUNNER_TEMP/cumcm-init-missing-year"
+          conflict_target="$RUNNER_TEMP/cumcm-init-conflict"
+          missing_year_report="$RUNNER_TEMP/cumcm-init-missing-year.json"
+          conflict_report="$RUNNER_TEMP/cumcm-init-conflict.json"
+          before_hashes="$RUNNER_TEMP/cumcm-init-conflict-before.sha256"
+          after_hashes="$RUNNER_TEMP/cumcm-init-conflict-after.sha256"
+          unverifiable_target="$RUNNER_TEMP/cumcm-init-unverifiable-engine"
+          unverifiable_report="$RUNNER_TEMP/cumcm-init-unverifiable-engine.json"
+          unverifiable_before_hashes="$RUNNER_TEMP/cumcm-init-unverifiable-before.sha256"
+          unverifiable_after_hashes="$RUNNER_TEMP/cumcm-init-unverifiable-after.sha256"
+
+          set +e
+          python -X utf8 cumcm-modeling/scripts/init_project.py \
+            "$missing_year_target" \
+            --project-id project:ci-missing-year \
+            >"$missing_year_report"
+          missing_year_status=$?
+          set -e
+          if [ "$missing_year_status" -ne 10 ]; then
+            echo "Expected missing --contest-year to exit 10, got $missing_year_status" >&2
+            exit 1
+          fi
+          if ! grep -q '"code": "CONTEST_YEAR_REQUIRED"' "$missing_year_report"; then
+            echo "Missing-year refusal did not report CONTEST_YEAR_REQUIRED" >&2
+            exit 1
+          fi
+          if [ -e "$missing_year_target" ]; then
+            echo "Missing-year refusal unexpectedly created $missing_year_target" >&2
+            exit 1
+          fi
+
+          python -X utf8 cumcm-modeling/scripts/init_project.py \
+            "$conflict_target" \
+            --project-id project:ci-conflict \
+            --contest-year 2035 \
+            --problem-code A \
+            --default-seed 42 \
+            --paper-engine latex \
+            >/dev/null
+          (
+            cd "$conflict_target"
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+          ) >"$before_hashes"
+
+          set +e
+          python -X utf8 cumcm-modeling/scripts/init_project.py \
+            "$conflict_target" \
+            --contest-year 2036 \
+            >"$conflict_report"
+          conflict_status=$?
+          set -e
+          if [ "$conflict_status" -ne 10 ]; then
+            echo "Expected conflicting --contest-year to exit 10, got $conflict_status" >&2
+            exit 1
+          fi
+          if ! grep -q '"code": "INITIALIZATION_PARAMETER_CONFLICT"' "$conflict_report"; then
+            echo "Conflicting-year refusal did not report INITIALIZATION_PARAMETER_CONFLICT" >&2
+            exit 1
+          fi
+          (
+            cd "$conflict_target"
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+          ) >"$after_hashes"
+          if ! cmp -s "$before_hashes" "$after_hashes"; then
+            echo "Initializer conflict changed target file bytes" >&2
+            diff -u "$before_hashes" "$after_hashes" || true
+            exit 1
+          fi
+
+          python -X utf8 cumcm-modeling/scripts/init_project.py \
+            "$unverifiable_target" \
+            --project-id project:ci-unverifiable-engine \
+            --contest-year 2035 \
+            --problem-code A \
+            --default-seed 42 \
+            --paper-engine latex \
+            >/dev/null
+          UNVERIFIABLE_TARGET="$unverifiable_target" python -X utf8 - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          script_root = Path("cumcm-modeling/scripts").resolve()
+          sys.path.insert(0, str(script_root))
+          from _contract_support import dump_yaml, load_yaml
+
+          manifest_path = Path(os.environ["UNVERIFIABLE_TARGET"]) / "manifest.yaml"
+          manifest = load_yaml(manifest_path)
+          manifest["extensions"]["initialization"].pop("paper_engine")
+          manifest["entrypoints"].pop("paper", None)
+          manifest_path.write_text(
+              dump_yaml(manifest), encoding="utf-8", newline="\n"
+          )
+          PY
+          (
+            cd "$unverifiable_target"
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+          ) >"$unverifiable_before_hashes"
+
+          set +e
+          python -X utf8 cumcm-modeling/scripts/init_project.py \
+            "$unverifiable_target" \
+            --paper-engine typst \
+            >"$unverifiable_report"
+          unverifiable_status=$?
+          set -e
+          if [ "$unverifiable_status" -ne 10 ]; then
+            echo "Expected unverifiable --paper-engine to exit 10, got $unverifiable_status" >&2
+            exit 1
+          fi
+          if ! grep -q '"code": "INITIALIZATION_PARAMETER_UNVERIFIABLE"' "$unverifiable_report"; then
+            echo "Unverifiable engine refusal did not report INITIALIZATION_PARAMETER_UNVERIFIABLE" >&2
+            exit 1
+          fi
+          if [ ! -d "$unverifiable_target" ]; then
+            echo "Unverifiable engine refusal removed its existing target" >&2
+            exit 1
+          fi
+          (
+            cd "$unverifiable_target"
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+          ) >"$unverifiable_after_hashes"
+          if ! cmp -s "$unverifiable_before_hashes" "$unverifiable_after_hashes"; then
+            echo "Initializer unverifiable-engine refusal changed target file bytes" >&2
+            diff -u "$unverifiable_before_hashes" "$unverifiable_after_hashes" || true
+            exit 1
+          fi
+
       - name: Exercise held-out non-overwriting recovery
         shell: bash
         run: |

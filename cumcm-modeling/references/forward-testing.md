@@ -20,6 +20,13 @@ python -X utf8 evals/run_held_out_resume.py <new-target-path>
 
 目标路径必须尚不存在。该 harness 初始化最小项目、加入中断恢复标记、再次调用初始化器并核对所有文件字节未被覆盖，随后用两个独立报告验证 `workflow_state`、`last_valid_gate`、`rollback_target` 和 `next_legal_action` 的确定性。项目和报告全部保留，脚本不删除文件。
 
+`evals/scenarios.yaml` 使用明确的执行状态：
+
+- `executable`：仓库中存在真实 fixture 和可运行 harness，可报告本次实际运行结果；
+- `specification_only`：只定义待观察行为，不能声称已经完成独立 Agent 端到端评测。
+
+当前只有 E17 具备独立可执行 harness。E01–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
+
 ## P0 行为场景
 
 | 场景 | 必须观察到的行为 |
@@ -51,3 +58,14 @@ python -X utf8 evals/run_held_out_resume.py <new-target-path>
 ## 迭代停止条件
 
 同一确定性脚本错误最多自动尝试修复两轮。若重复失败、需要改变科学假设、需要降低阈值或需要扩大容差，停止自动修复并报告根因。Skill 的改动必须由实际失败支持，不能为单个例子累积成普遍硬规则。
+
+## 待建设的可执行场景
+
+后续至少需要为以下行为补齐独立材料、fixture、harness 和结果判定，完成前保持 `specification_only`：
+
+- 时序预测泄漏与时间顺序验证；
+- 启发式优化约束回代与最优性措辞；
+- 综合评价中的权重扰动和排名翻转；
+- 数据、结果模板、说明与参考资料混合目录的输入角色识别。
+
+不得为了填满场景而生成虚构的优秀论文或伪造独立 Agent 结果。
