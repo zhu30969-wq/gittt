@@ -14,6 +14,29 @@
     "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}},
     "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
     "extensions": {"type": "object"},
+    "team_members": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "allOf": [
+              {"$ref": "common.schema.json#/$defs/typedId"},
+              {"pattern": "^member:"}
+            ]
+          },
+          "display_name": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+          "primary_role": {
+            "type": "string",
+            "enum": ["modeling", "computation", "writing"]
+          }
+        },
+        "required": ["id", "display_name", "primary_role"]
+      }
+    },
     "reviews": {
       "type": "array",
       "items": {
@@ -24,9 +47,21 @@
           "gate": {"type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7"]},
           "decision": {"$ref": "common.schema.json#/$defs/validationStatus"},
           "basis": {"type": "string", "enum": ["human", "hybrid"]},
-          "reviewer": {"type": "string", "minLength": 1},
+          "approval_set_id": {
+            "allOf": [
+              {"$ref": "common.schema.json#/$defs/typedId"},
+              {"pattern": "^approval:"}
+            ]
+          },
+          "member_id": {
+            "allOf": [
+              {"$ref": "common.schema.json#/$defs/typedId"},
+              {"pattern": "^member:"}
+            ]
+          },
+          "reviewer": {"$ref": "common.schema.json#/$defs/nonBlankString"},
           "reviewed_at": {"type": "string", "format": "date-time"},
-          "rationale": {"type": "string", "minLength": 1},
+          "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"},
           "evidence_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
           "artifact_fingerprints": {
             "type": "object",
@@ -35,10 +70,10 @@
           },
           "conditions": {"type": "array", "items": {"type": "string", "minLength": 1}}
         },
-        "required": ["id", "gate", "decision", "basis", "reviewer", "reviewed_at", "rationale", "evidence_refs", "artifact_fingerprints", "conditions"]
+        "required": ["id", "gate", "decision", "basis", "approval_set_id", "member_id", "reviewer", "reviewed_at", "rationale", "evidence_refs", "artifact_fingerprints", "conditions"]
       }
     }
   },
-  "required": ["reviews"],
+  "required": ["team_members", "reviews"],
   "unevaluatedProperties": false
 }

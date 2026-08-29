@@ -29,6 +29,7 @@ try:
         VALIDATION_STATUSES,
         dump_yaml,
         exclusive_sidecar_lock,
+        load_json_strict,
         load_yaml,
         safe_project_path,
         sha256_file,
@@ -46,7 +47,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gate", required=True, choices=[f"G{number}" for number in range(8)])
     parser.add_argument("--decision", required=True, choices=VALIDATION_STATUSES)
     parser.add_argument("--basis", choices=["human", "hybrid"], default="human")
-    parser.add_argument("--reviewer", required=True)
+    parser.add_argument(
+        "--approval-set-id",
+        required=True,
+        help="Immutable approval round ID such as approval:g4-r2; all co-signers use the same ID",
+    )
+    parser.add_argument("--member-id", required=True, help="Stable team member ID declared in team_members")
+    parser.add_argument(
+        "--member-name",
+        help="Display name used only when creating a previously absent review log",
+    )
+    parser.add_argument(
+        "--member-role",
+        choices=["modeling", "computation", "writing"],
+        help="Primary role used only when creating a previously absent review log",
+    )
+    parser.add_argument(
+        "--reviewer",
+        help="Optional display-name cross-check; omitted values are read from the declared team member",
+    )
     parser.add_argument("--rationale", required=True)
     parser.add_argument("--evidence", action="append", default=[], help="Typed evidence ID; repeat as needed")
     parser.add_argument(
@@ -92,7 +111,8 @@ def validate_document(document: dict[str, Any], schema_root: Path) -> list[str]:
     schemas: dict[str, dict[str, Any]] = {}
     registry = Registry()
     for path in schema_root.glob("*.schema.json"):
-        schema = json.loads(path.read_text(encoding="utf-8"))
+        schema = load_json_strict(path)
+        Draft202012Validator.check_schema(schema)
         schema["$id"] = path.resolve().as_uri()
         schemas[path.name] = schema
         registry = registry.with_resource(schema["$id"], Resource.from_contents(schema))
@@ -157,8 +177,27 @@ def _process_review(
             print(json.dumps({"status": "BLOCK", "message": f"cannot read review log: {exc}"}, ensure_ascii=False))
             return 10
     else:
+        bootstrap_name = (
+            args.member_name.strip()
+            if isinstance(args.member_name, str)
+            else args.reviewer.strip()
+            if isinstance(args.reviewer, str)
+            else ""
+        )
+        if not bootstrap_name or args.member_role is None:
+            print(
+                json.dumps(
+                    {
+                        "status": "BLOCK",
+                        "code": "REVIEW_TEAM_BOOTSTRAP_REQUIRED",
+                        "message": "a new review log requires --member-name and --member-role",
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return 10
         document = {
-            "schema_version": "1.0.0",
+            "schema_version": "2.0.0",
             "kind": "gate_review",
             "id": "review:gates",
             "revision": 1,
@@ -166,14 +205,100 @@ def _process_review(
             "depends_on": [],
             "provenance": {"author_type": "human"},
             "extensions": {},
+            "team_members": [
+                {
+                    "id": args.member_id,
+                    "display_name": bootstrap_name,
+                    "primary_role": args.member_role,
+                }
+            ],
             "reviews": [],
         }
     if not isinstance(document, dict) or document.get("kind") != "gate_review":
         print(json.dumps({"status": "BLOCK", "message": "review log is not a gate_review contract"}, ensure_ascii=False))
         return 10
 
+    team_by_id = {
+        member.get("id"): member
+        for member in document.get("team_members", [])
+        if isinstance(member, dict) and isinstance(member.get("id"), str)
+    }
+    member = team_by_id.get(args.member_id)
+    if member is None:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "REVIEW_MEMBER_UNDECLARED",
+                    "message": f"member is not declared in team_members: {args.member_id}",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+    declared_name = str(member.get("display_name", "")).strip()
+    if isinstance(args.member_name, str) and args.member_name.strip() != declared_name:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "MEMBER_NAME_MISMATCH",
+                    "message": "--member-name conflicts with the existing team declaration",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+    if args.member_role is not None and args.member_role != member.get("primary_role"):
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "MEMBER_ROLE_MISMATCH",
+                    "message": "--member-role conflicts with the existing team declaration",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+    supplied_name = args.reviewer.strip() if isinstance(args.reviewer, str) else declared_name
+    if supplied_name != declared_name:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "REVIEWER_NAME_MISMATCH",
+                    "message": "--reviewer must match the member's declared display_name",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+
+    duplicates = [
+        item
+        for item in document.get("reviews", [])
+        if isinstance(item, dict)
+        and item.get("gate") == args.gate
+        and item.get("approval_set_id") == args.approval_set_id
+        and item.get("member_id") == args.member_id
+    ]
+    if duplicates:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "APPROVAL_MEMBER_ALREADY_RECORDED",
+                    "message": "one member may sign a gate approval set only once; start a new approval set to change a decision",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+
     now = datetime.now(timezone.utc).replace(microsecond=0)
-    generated_id = f"review:{args.gate.lower()}-{now.strftime('%Y%m%dt%H%M%S')}z-{uuid.uuid4().hex[:8]}"
+    member_suffix = args.member_id.split(":", 1)[1]
+    generated_id = f"review:{args.gate.lower()}-{member_suffix}-{now.strftime('%Y%m%dt%H%M%S')}z-{uuid.uuid4().hex[:8]}"
     review_id = args.review_id or generated_id
     if not TYPED_ID_RE.fullmatch(review_id) or not review_id.startswith("review:"):
         print(json.dumps({"status": "BLOCK", "message": "--review-id must match review:<id>"}, ensure_ascii=False))
@@ -187,7 +312,9 @@ def _process_review(
         "gate": args.gate,
         "decision": args.decision,
         "basis": args.basis,
-        "reviewer": args.reviewer.strip(),
+        "approval_set_id": args.approval_set_id,
+        "member_id": args.member_id,
+        "reviewer": declared_name,
         "reviewed_at": now.isoformat().replace("+00:00", "Z"),
         "rationale": args.rationale.strip(),
         "evidence_refs": args.evidence,
@@ -262,6 +389,34 @@ def main() -> int:
         print(
             json.dumps(
                 {"status": "BLOCK", "code": "ARGUMENT_INVALID", "message": str(exc)},
+                ensure_ascii=False,
+            )
+        )
+        return 10
+
+    if (
+        not TYPED_ID_RE.fullmatch(args.approval_set_id)
+        or not args.approval_set_id.startswith("approval:")
+    ):
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "APPROVAL_SET_ID_INVALID",
+                    "message": "--approval-set-id must match approval:<id>",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 10
+    if not TYPED_ID_RE.fullmatch(args.member_id) or not args.member_id.startswith("member:"):
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "MEMBER_ID_INVALID",
+                    "message": "--member-id must match member:<id>",
+                },
                 ensure_ascii=False,
             )
         )

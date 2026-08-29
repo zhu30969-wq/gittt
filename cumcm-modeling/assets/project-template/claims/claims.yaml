@@ -1,9 +1,9 @@
-schema_version: 1.0.0
+schema_version: 2.0.0
 kind: claims
 id: claims:main
 revision: 1
 lifecycle_status: draft
-depends_on: [result:main]
+depends_on: [problem:main, result:main]
 provenance:
   author_type: human
 extensions: {}
@@ -16,6 +16,7 @@ claims:
     scope: "说明适用的数据、对象与条件。"
     evidence_refs: []
     assumption_refs: [assumption:a1]
+    deliverable_refs: [deliverable:q1]
     limitations: ["模板结论尚无实验证据，不能进入正式论文。"]
     counterevidence: []
     numeric_assertions: []

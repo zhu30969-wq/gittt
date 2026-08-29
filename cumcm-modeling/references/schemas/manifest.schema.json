@@ -8,8 +8,41 @@
       "if": {"properties": {"manifest_type": {"const": "release"}}, "required": ["manifest_type"]},
       "then": {
         "properties": {
-          "entrypoints": {"required": ["paper", "run"]},
-          "deliverables": {"minItems": 1}
+          "entrypoints": {"required": ["paper", "pdf"]},
+          "artifacts": {
+            "contains": {
+              "type": "object",
+              "properties": {"kind": {"const": "paper_build"}, "required": {"const": true}},
+              "required": ["kind", "required"]
+            },
+            "minContains": 1,
+            "maxContains": 1
+          },
+          "deliverables": {
+            "minItems": 1,
+            "allOf": [
+              {
+                "contains": {
+                  "type": "object",
+                  "properties": {"role": {"const": "paper_source"}, "required": {"const": true}},
+                  "required": ["role", "required"]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ],
+            "contains": {
+              "type": "object",
+              "properties": {
+                "role": {"const": "paper_pdf"},
+                "media_type": {"const": "application/pdf"},
+                "required": {"const": true}
+              },
+              "required": ["role", "media_type", "required"]
+            },
+            "minContains": 1,
+            "maxContains": 1
+          }
         }
       }
     }
@@ -32,10 +65,31 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "id": {"oneOf": [{"$ref": "common.schema.json#/$defs/typedId"}, {"type": "null"}]},
         "path": {"oneOf": [{"$ref": "common.schema.json#/$defs/relativePath"}, {"type": "null"}]},
+        "sha256": {"oneOf": [{"$ref": "common.schema.json#/$defs/sha256"}, {"type": "null"}]},
         "note": {"type": "string", "minLength": 1}
       },
-      "required": ["enabled", "path", "note"]
+      "required": ["enabled", "id", "path", "sha256", "note"],
+      "allOf": [
+        {
+          "if": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]},
+          "then": {
+            "properties": {
+              "id": {"$ref": "common.schema.json#/$defs/typedId"},
+              "path": {"$ref": "common.schema.json#/$defs/relativePath"},
+              "sha256": {"$ref": "common.schema.json#/$defs/sha256"}
+            }
+          },
+          "else": {
+            "properties": {
+              "id": {"type": "null"},
+              "path": {"type": "null"},
+              "sha256": {"type": "null"}
+            }
+          }
+        }
+      ]
     },
     "artifacts": {
       "type": "array",
@@ -45,7 +99,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {"$ref": "common.schema.json#/$defs/typedId"},
-          "kind": {"type": "string", "enum": ["problem_spec", "model_spec", "experiment", "results", "claims", "figures", "gate_review"]},
+          "kind": {"type": "string", "enum": ["problem_spec", "model_spec", "model_promotion", "experiment", "results", "claims", "figures", "paper_build", "gate_review"]},
           "path": {"$ref": "common.schema.json#/$defs/relativePath"},
           "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
           "required": {"type": "boolean"},
@@ -83,9 +137,14 @@
           "id": {"$ref": "common.schema.json#/$defs/typedId"},
           "path": {"$ref": "common.schema.json#/$defs/relativePath"},
           "sha256": {"$ref": "common.schema.json#/$defs/sha256"},
-          "required": {"type": "boolean"}
+          "required": {"type": "boolean"},
+          "role": {
+            "type": "string",
+            "enum": ["paper_source", "paper_pdf", "code", "result", "data", "appendix", "other"]
+          },
+          "media_type": {"type": "string", "minLength": 1}
         },
-        "required": ["id", "path", "sha256", "required"]
+        "required": ["id", "path", "sha256", "required", "role", "media_type"]
       }
     },
     "notes": {"type": "array", "items": {"type": "string", "minLength": 1}}

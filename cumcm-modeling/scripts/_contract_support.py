@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import errno
+import json
 import math
 import os
 import re
+import stat
 import tempfile
 import time
 import unicodedata
@@ -66,6 +68,43 @@ class DuplicateKeyError(ValueError):
 
 class UniqueKeyLoader(yaml.SafeLoader):
     """SafeLoader variant that rejects duplicate mapping keys."""
+
+
+def _construct_unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON keys instead of accepting the last value."""
+
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKeyError(f"duplicate JSON key: {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(token: str) -> None:
+    """Reject the non-standard NaN/Infinity constants accepted by json.loads."""
+
+    raise ValueError(f"non-finite JSON constant: {token}")
+
+
+def _finite_json_float(token: str) -> float:
+    """Parse a JSON number while rejecting overflow to infinity."""
+
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError(f"non-finite JSON number: {token}")
+    return value
+
+
+def load_json_strict(path: Path) -> Any:
+    """Read UTF-8 JSON without duplicate keys or non-finite numbers."""
+
+    return json.loads(
+        path.read_text(encoding="utf-8"),
+        object_pairs_hook=_construct_unique_json_object,
+        parse_constant=_reject_json_constant,
+        parse_float=_finite_json_float,
+    )
 
 
 class LockTimeoutError(TimeoutError):
@@ -278,6 +317,53 @@ def _is_lock_contention(error: OSError) -> bool:
     ) in {33, 36, 158}
 
 
+def _lock_sidecar_is_reparse(metadata: os.stat_result) -> bool:
+    """Return whether Windows reports a symlink/junction-like reparse point."""
+
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    reparse_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(attributes & reparse_attribute)
+
+
+def _validate_lock_sidecar_metadata(
+    metadata: os.stat_result, *, lock_path: Path, source: str
+) -> None:
+    """Reject lock objects that could alias bytes outside the target directory."""
+
+    if stat.S_ISLNK(metadata.st_mode) or _lock_sidecar_is_reparse(metadata):
+        raise ValueError(
+            f"lock sidecar must not be a symlink or reparse point ({source}): {lock_path}"
+        )
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ValueError(
+            f"lock sidecar must be a regular file ({source}): {lock_path}"
+        )
+    if metadata.st_nlink > 1:
+        raise ValueError(
+            f"lock sidecar must not have multiple hard links ({source}): {lock_path}"
+        )
+
+
+def _verify_open_lock_sidecar(lock_path: Path, handle: Any) -> None:
+    """Verify the opened file and current pathname identify one safe object."""
+
+    opened_metadata = os.fstat(handle.fileno())
+    _validate_lock_sidecar_metadata(
+        opened_metadata, lock_path=lock_path, source="opened handle"
+    )
+    try:
+        path_metadata = lock_path.lstat()
+    except FileNotFoundError as exc:
+        raise ValueError(f"lock sidecar disappeared after opening: {lock_path}") from exc
+    _validate_lock_sidecar_metadata(
+        path_metadata, lock_path=lock_path, source="current path"
+    )
+    if not os.path.samestat(opened_metadata, path_metadata):
+        raise ValueError(
+            f"lock sidecar changed between path lookup and open: {lock_path}"
+        )
+
+
 @contextmanager
 def exclusive_sidecar_lock(
     target: Path,
@@ -300,13 +386,39 @@ def exclusive_sidecar_lock(
 
     lock_path = sidecar_lock_path(target)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    handle = lock_path.open("a+b")
+    try:
+        existing_metadata = lock_path.lstat()
+    except FileNotFoundError:
+        existing_metadata = None
+    if existing_metadata is not None:
+        _validate_lock_sidecar_metadata(
+            existing_metadata, lock_path=lock_path, source="pre-open path"
+        )
+
+    flags = os.O_RDWR | os.O_CREAT
+    for optional_flag in ("O_BINARY", "O_CLOEXEC", "O_NOINHERIT", "O_NOFOLLOW"):
+        flags |= getattr(os, optional_flag, 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        if exc.errno == getattr(errno, "ELOOP", None):
+            raise ValueError(
+                f"lock sidecar must not be a symlink or reparse point: {lock_path}"
+            ) from exc
+        raise
+    handle = os.fdopen(descriptor, "r+b")
     acquired = False
     try:
+        # Recheck the opened object before any sentinel write.  The pre-open
+        # lstat gives a useful early error, while fstat + samestat closes the
+        # lookup/open race and detects hard-link or reparse-point substitution.
+        _verify_open_lock_sidecar(lock_path, handle)
+
         # Windows byte-range locking requires the byte to exist.  Concurrent
-        # initializers may append more than one sentinel, but every contender
-        # consistently locks byte zero and the sidecar remains stable.
+        # initializers may both write the same sentinel at offset zero, but
+        # every contender consistently locks byte zero and file size stays one.
         if os.fstat(handle.fileno()).st_size == 0:
+            handle.seek(0)
             handle.write(b"\0")
             handle.flush()
             os.fsync(handle.fileno())
@@ -316,6 +428,10 @@ def exclusive_sidecar_lock(
             try:
                 _try_lock(handle)
                 acquired = True
+                # POSIX permits unlink/replace while the old inode is locked.
+                # Refuse to enter the caller's critical section if that has
+                # already split the stable pathname from this open handle.
+                _verify_open_lock_sidecar(lock_path, handle)
                 break
             except OSError as exc:
                 if not _is_lock_contention(exc):

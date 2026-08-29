@@ -38,6 +38,25 @@
     "parameters": {"type": "object"},
     "split_strategy": {"type": "string", "minLength": 1},
     "baseline_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "baseline_comparison_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "check_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "baseline_model_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "primary_metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "delta_definition": {"const": "primary_minus_baseline"},
+          "operator": {"type": "string", "enum": ["==", "!=", "<", "<=", ">", ">="]},
+          "threshold": {"type": "number"},
+          "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+          "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+        },
+        "required": ["id", "check_ref", "baseline_model_ref", "primary_metric_ref", "delta_definition", "operator", "threshold", "unit", "rationale"]
+      }
+    },
     "metrics": {
       "type": "array",
       "minItems": 1,
@@ -48,10 +67,43 @@
           "id": {"$ref": "common.schema.json#/$defs/typedId"},
           "name": {"type": "string", "minLength": 1},
           "direction": {"type": "string", "enum": ["minimize", "maximize", "target", "descriptive"]},
-          "unit": {"type": "string", "minLength": 1},
-          "aggregation": {"type": "string", "minLength": 1}
+          "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+          "aggregation": {"type": "string", "minLength": 1},
+          "source_output_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "extractor": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "json_pointer"},
+                  "pointer": {"type": "string", "pattern": "^(?:|/.*)$"}
+                },
+                "required": ["type", "pointer"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "yaml_pointer"},
+                  "pointer": {"type": "string", "pattern": "^(?:|/.*)$"}
+                },
+                "required": ["type", "pointer"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "csv_cell"},
+                  "row_index": {"type": "integer", "minimum": 0},
+                  "column": {"type": "string", "minLength": 1}
+                },
+                "required": ["type", "row_index", "column"]
+              }
+            ]
+          }
         },
-        "required": ["id", "name", "direction", "unit", "aggregation"]
+        "required": ["id", "name", "direction", "unit", "aggregation", "source_output_ref", "extractor"]
       }
     },
     "acceptance_rules": {
@@ -63,9 +115,9 @@
           "metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
           "operator": {"type": "string", "enum": ["==", "!=", "<", "<=", ">", ">="]},
           "threshold": {"type": "number"},
-          "unit": {"type": "string", "minLength": 1},
+          "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
           "registration_timing": {"type": "string", "enum": ["pre_result", "post_result"]},
-          "rationale": {"type": "string", "minLength": 1}
+          "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
         },
         "required": ["metric_ref", "operator", "threshold", "unit", "registration_timing", "rationale"]
       }
@@ -85,11 +137,53 @@
             "additionalProperties": false,
             "properties": {
               "type": {"type": "string", "enum": ["exact_sha256", "json_numeric", "csv_numeric", "existence"]},
+              "expected_sha256": {
+                "oneOf": [
+                  {"$ref": "common.schema.json#/$defs/sha256"},
+                  {"type": "null"}
+                ]
+              },
+              "reference_file": {
+                "oneOf": [
+                  {"$ref": "common.schema.json#/$defs/fileRef"},
+                  {"type": "null"}
+                ]
+              },
               "absolute_tolerance": {"type": "number", "minimum": 0},
               "relative_tolerance": {"type": "number", "minimum": 0},
               "key_columns": {"type": "array", "items": {"type": "string", "minLength": 1}}
             },
-            "required": ["type"]
+            "required": ["type", "expected_sha256", "reference_file"],
+            "allOf": [
+              {
+                "if": {"properties": {"type": {"const": "exact_sha256"}}, "required": ["type"]},
+                "then": {
+                  "properties": {
+                    "expected_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+                    "reference_file": {"type": "null"}
+                  }
+                }
+              },
+              {
+                "if": {"properties": {"type": {"enum": ["json_numeric", "csv_numeric"]}}, "required": ["type"]},
+                "then": {
+                  "properties": {
+                    "expected_sha256": {"type": "null"},
+                    "reference_file": {"$ref": "common.schema.json#/$defs/fileRef"}
+                  },
+                  "required": ["absolute_tolerance", "relative_tolerance"]
+                }
+              },
+              {
+                "if": {"properties": {"type": {"const": "existence"}}, "required": ["type"]},
+                "then": {
+                  "properties": {
+                    "expected_sha256": {"type": "null"},
+                    "reference_file": {"type": "null"}
+                  }
+                }
+              }
+            ]
           }
         },
         "required": ["id", "path", "required", "comparator"]
@@ -98,6 +192,6 @@
     "timeout_seconds": {"type": "integer", "minimum": 1},
     "resource_note": {"type": "string", "minLength": 1}
   },
-  "required": ["model_ref", "question_refs", "mode", "purpose", "hypothesis", "data_refs", "code_files", "environment", "command", "seeds", "repetitions", "parameters", "split_strategy", "baseline_refs", "metrics", "acceptance_rules", "outputs", "timeout_seconds", "resource_note"],
+  "required": ["model_ref", "question_refs", "mode", "purpose", "hypothesis", "data_refs", "code_files", "environment", "command", "seeds", "repetitions", "parameters", "split_strategy", "baseline_refs", "baseline_comparison_rules", "metrics", "acceptance_rules", "outputs", "timeout_seconds", "resource_note"],
   "unevaluatedProperties": false
 }

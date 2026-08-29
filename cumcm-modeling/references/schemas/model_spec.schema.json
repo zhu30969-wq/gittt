@@ -17,6 +17,15 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"role": {"const": "primary"}}, "required": ["role"]},
+      "then": {
+        "properties": {
+          "method_selection": {"properties": {"decision": {"const": "selected"}}},
+          "validation_plan": {"properties": {"checks": {"minItems": 1}}}
+        }
+      }
     }
   ],
   "type": "object",
@@ -37,7 +46,54 @@
       "type": "string",
       "enum": ["descriptive", "statistical", "prediction", "optimization", "simulation", "evaluation", "causal", "hybrid", "other"]
     },
+    "method_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {"type": "string", "enum": ["selected", "conditional", "rejected"]},
+        "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+        "baseline_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {"type": "string", "enum": ["required", "waived"]},
+            "model_refs": {
+              "type": "array",
+              "items": {"$ref": "common.schema.json#/$defs/typedId"},
+              "uniqueItems": true
+            },
+            "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+          },
+          "required": ["status", "model_refs", "rationale"],
+          "allOf": [
+            {
+              "if": {"properties": {"status": {"const": "required"}}, "required": ["status"]},
+              "then": {"properties": {"model_refs": {"minItems": 1}}}
+            },
+            {
+              "if": {"properties": {"status": {"const": "waived"}}, "required": ["status"]},
+              "then": {"properties": {"model_refs": {"maxItems": 0}}}
+            }
+          ]
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "disposition": {"type": "string", "enum": ["rejected", "fallback", "deferred"]},
+              "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+            },
+            "required": ["name", "disposition", "rationale"]
+          }
+        }
+      },
+      "required": ["decision", "rationale", "baseline_policy", "alternatives"]
+    },
     "assumption_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+    "constraint_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
     "symbols": {
       "type": "array",
       "minItems": 1,
@@ -50,7 +106,7 @@
           "role": {"type": "string", "enum": ["decision", "state", "parameter", "input", "output", "index", "constant"]},
           "domain": {"type": "string", "minLength": 1},
           "shape": {"type": "string", "minLength": 1},
-          "unit": {"type": "string", "minLength": 1},
+          "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
           "definition": {"type": "string", "minLength": 1}
         },
         "required": ["id", "name", "role", "domain", "shape", "unit", "definition"]
@@ -74,10 +130,16 @@
         "properties": {
           "symbol_ref": {"$ref": "common.schema.json#/$defs/typedId"},
           "data_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "question_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "common.schema.json#/$defs/typedId"},
+            "uniqueItems": true
+          },
           "field": {"type": "string", "minLength": 1},
           "transformation": {"type": "string", "minLength": 1}
         },
-        "required": ["symbol_ref", "data_ref", "field", "transformation"]
+        "required": ["symbol_ref", "data_ref", "question_refs", "field", "transformation"]
       }
     },
     "algorithm": {
@@ -95,18 +157,127 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "methods": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-        "failure_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {"$ref": "common.schema.json#/$defs/typedId"},
+              "check_type": {"$ref": "#/$defs/validationCheckType"},
+              "applicability": {"type": "string", "enum": ["required", "conditional", "not_applicable"]},
+              "activation_condition": {
+                "oneOf": [
+                  {"type": "null"},
+                  {"$ref": "common.schema.json#/$defs/nonBlankString"}
+                ]
+              },
+              "criticality": {"type": "string", "enum": ["blocking", "advisory"]},
+              "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+              "procedure": {"type": "string", "minLength": 1},
+              "pass_rule": {"type": "string", "minLength": 1},
+              "threshold": {
+                "oneOf": [
+                  {"type": "null"},
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "operator": {"type": "string", "enum": ["==", "!=", "<", "<=", ">", ">="]},
+                      "value": {"type": "number"},
+                  "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+                    },
+                    "required": ["operator", "value", "unit"]
+                  }
+                ]
+              },
+              "failure_response": {
+                "type": "string",
+                "enum": ["block_result", "return_to_modeling", "downgrade_claim", "report_only"]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {"applicability": {"const": "conditional"}},
+                  "required": ["applicability"]
+                },
+                "then": {
+                  "properties": {"activation_condition": {"$ref": "common.schema.json#/$defs/nonBlankString"}}
+                },
+                "else": {
+                  "properties": {"activation_condition": {"type": "null"}}
+                }
+              }
+            ],
+            "required": [
+              "id",
+              "check_type",
+              "applicability",
+              "activation_condition",
+              "criticality",
+              "rationale",
+              "procedure",
+              "pass_rule",
+              "threshold",
+              "failure_response"
+            ]
+          }
+        },
         "human_review_required": {"type": "boolean", "const": true}
       },
-      "required": ["methods", "failure_criteria", "human_review_required"]
+      "required": ["checks", "human_review_required"]
     },
     "sensitivity_plan": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "applicability": {"type": "string", "minLength": 1},
     "failure_modes": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
     "fallback_models": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true}
+    ,
+    "fallback_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "model_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "trigger_check_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "activation_condition": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+          "action": {"const": "promote_to_primary"},
+          "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+        },
+        "required": ["model_ref", "trigger_check_ref", "activation_condition", "action", "rationale"]
+      }
+    }
   },
   "$defs": {
+    "validationCheckType": {
+      "type": "string",
+      "enum": [
+        "input_integrity",
+        "dimensional_consistency",
+        "domain_validity",
+        "formula_back_substitution",
+        "baseline_comparison",
+        "holdout_leakage",
+        "predictive_error",
+        "uncertainty",
+        "residual_diagnostics",
+        "constraint_feasibility",
+        "solver_optimality",
+        "convergence",
+        "conservation_balance",
+        "numerical_stability",
+        "seed_stability",
+        "sensitivity",
+        "rank_stability",
+        "identifiability",
+        "falsification",
+        "boundary_case",
+        "reproducibility",
+        "other"
+      ]
+    },
     "formulaList": {
       "type": "array",
       "items": {
@@ -118,12 +289,13 @@
           "format": {"type": "string", "enum": ["latex", "typst", "plain", "sympy"]},
           "defines": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
           "uses": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
+          "source_constraint_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
           "interpretation": {"type": "string", "minLength": 1}
         },
-        "required": ["id", "expression", "format", "defines", "uses", "interpretation"]
+        "required": ["id", "expression", "format", "defines", "uses", "source_constraint_refs", "interpretation"]
       }
     }
   },
-  "required": ["problem_ref", "addresses", "role", "model_family", "assumption_refs", "symbols", "formulation", "data_bindings", "algorithm", "validation_plan", "sensitivity_plan", "applicability", "failure_modes", "fallback_models"],
+  "required": ["problem_ref", "addresses", "role", "model_family", "method_selection", "assumption_refs", "constraint_refs", "symbols", "formulation", "data_bindings", "algorithm", "validation_plan", "sensitivity_plan", "applicability", "failure_modes", "fallback_models", "fallback_rules"],
   "unevaluatedProperties": false
 }

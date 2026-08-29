@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,7 @@ except ImportError as exc:  # pragma: no cover
 
 
 ZERO_HASH = "0" * 64
+SCHEMA_VERSION_RE = re.compile(r"^2\.[0-9]+\.[0-9]+$")
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +128,15 @@ def _process_manifest(
         return emit("BLOCK", "write" if args.write else "diff", manifest_path, findings)
     if not isinstance(manifest, dict) or manifest.get("kind") != "manifest":
         findings.append({"status": "BLOCK", "code": "NOT_A_MANIFEST", "message": "manifest.yaml is not a manifest contract"})
+        return emit("BLOCK", "write" if args.write else "diff", manifest_path, findings)
+    if not isinstance(manifest.get("schema_version"), str) or not SCHEMA_VERSION_RE.fullmatch(manifest["schema_version"]):
+        findings.append(
+            {
+                "status": "BLOCK",
+                "code": "SCHEMA_VERSION_UNSUPPORTED",
+                "message": "manifest.py only accepts schema_version 2.x.x; migrate the project before refreshing hashes",
+            }
+        )
         return emit("BLOCK", "write" if args.write else "diff", manifest_path, findings)
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:

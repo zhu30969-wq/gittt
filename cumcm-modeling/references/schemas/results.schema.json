@@ -2,7 +2,23 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "results.schema.json",
   "title": "CUMCM experiment results",
-  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/artifactBase"},
+    {
+      "if": {"properties": {"run_status": {"const": "success"}}, "required": ["run_status"]},
+      "then": {
+        "properties": {
+          "diagnostics": {"minItems": 1},
+          "failure_reason": {"type": "null"}
+        }
+      },
+      "else": {
+        "properties": {
+          "failure_reason": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+        }
+      }
+    }
+  ],
   "type": "object",
   "properties": {
     "$schema": {"type": "string"},
@@ -33,12 +49,13 @@
         "cwd": {"$ref": "common.schema.json#/$defs/relativePath"},
         "exit_code": {"type": "integer"},
         "seeds": {"type": "array", "items": {"type": "integer"}},
+        "repetitions_completed": {"type": "integer", "minimum": 0},
         "platform": {"type": "string", "minLength": 1},
         "git_commit": {"type": ["string", "null"]},
         "git_dirty": {"type": ["boolean", "null"]},
         "environment_note": {"type": "string", "minLength": 1}
       },
-      "required": ["run_id", "started_at", "finished_at", "argv", "cwd", "exit_code", "seeds", "platform", "git_commit", "git_dirty", "environment_note"]
+      "required": ["run_id", "started_at", "finished_at", "argv", "cwd", "exit_code", "seeds", "repetitions_completed", "platform", "git_commit", "git_dirty", "environment_note"]
     },
     "inputs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
     "outputs": {
@@ -80,7 +97,122 @@
         "required": ["metric_ref", "measurement", "sample_size", "uncertainty"]
       }
     },
-    "diagnostics": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "check_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+          "check_type": {"$ref": "model_spec.schema.json#/$defs/validationCheckType"},
+          "status": {"$ref": "common.schema.json#/$defs/validationStatus"},
+          "condition_met": {"type": ["boolean", "null"]},
+          "condition_evidence": {"type": ["string", "null"], "minLength": 1},
+          "severity": {"type": "string", "enum": ["critical", "major", "minor", "info"]},
+          "procedure": {"type": "string", "minLength": 1},
+          "observation": {"type": "string", "minLength": 1},
+          "observed": {
+            "oneOf": [
+              {"$ref": "common.schema.json#/$defs/measurement"},
+              {"type": "null"}
+            ]
+          },
+          "source_file": {
+            "oneOf": [
+              {"$ref": "common.schema.json#/$defs/fileRef"},
+              {"type": "null"}
+            ]
+          },
+          "extractor": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "json_pointer"},
+                  "pointer": {"type": "string", "pattern": "^(?:|/.*)$"}
+                },
+                "required": ["type", "pointer"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "yaml_pointer"},
+                  "pointer": {"type": "string", "pattern": "^(?:|/.*)$"}
+                },
+                "required": ["type", "pointer"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {"const": "csv_cell"},
+                  "row_index": {"type": "integer", "minimum": 0},
+                  "column": {"type": "string", "minLength": 1}
+                },
+                "required": ["type", "row_index", "column"]
+              }
+            ]
+          },
+          "conclusion": {"type": "string", "minLength": 1},
+          "evidence_files": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
+          "comparison_bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "baseline_model_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "baseline_result_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "primary_metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "baseline_metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "comparison_rule_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+                "observed_delta": {"$ref": "common.schema.json#/$defs/measurement"},
+                "status": {"$ref": "common.schema.json#/$defs/validationStatus"}
+              },
+              "required": ["baseline_model_ref", "baseline_result_ref", "primary_metric_ref", "baseline_metric_ref", "comparison_rule_ref", "observed_delta", "status"]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"check_type": {"const": "baseline_comparison"}},
+              "required": ["check_type"]
+            },
+            "then": {
+              "if": {
+                "properties": {"status": {"const": "NOT_APPLICABLE"}},
+                "required": ["status"]
+              },
+              "then": {"properties": {"comparison_bindings": {"maxItems": 0}}},
+              "else": {"properties": {"comparison_bindings": {"minItems": 1}}}
+            },
+            "else": {"properties": {"comparison_bindings": {"maxItems": 0}}}
+          }
+        ],
+        "required": [
+          "id",
+          "check_ref",
+          "check_type",
+          "status",
+          "condition_met",
+          "condition_evidence",
+          "severity",
+          "procedure",
+          "observation",
+          "observed",
+          "source_file",
+          "extractor",
+          "conclusion",
+          "evidence_files",
+          "comparison_bindings"
+        ]
+      }
+    },
     "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "failure_reason": {"type": ["string", "null"]},
     "logs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}}

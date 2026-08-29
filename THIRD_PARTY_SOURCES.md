@@ -1,10 +1,34 @@
 # 第三方来源与原创边界
 
-本文件记录本项目在设计 CUMCM 数学建模 Skill 时查阅的第三方公开仓库、固定版本、许可证状态与 clean-room（洁净室）原创边界。记录日期为 2026-08-27。
+本文件记录本项目在设计 CUMCM 数学建模 Skill 时查阅的第三方公开仓库、固定版本、许可证状态与 clean-room（洁净室）原创边界。固定版本与远端 HEAD 已于 2026-08-28 再次核对。
 
 ## 来源清单
 
-### 1. zhnnky329/MathModeling-skills
+### 1. jihe520/MathModelAgent
+
+- 固定分支与 HEAD：`main` @ `83d8783187a2d29dda1b046cb667009cc50c8203`
+- 固定版本：[jihe520/MathModelAgent@83d8783](https://github.com/jihe520/MathModelAgent/tree/83d8783187a2d29dda1b046cb667009cc50c8203)
+- 参考角色：用于研究从赛题分析、模型建立、计算绘图到中文论文和最终验收的端到端执行层。
+- 许可证/版权状态：固定版本根目录未发现 `LICENSE`、`LICENCE`、`COPYING` 或 `NOTICE`，GitHub License API 也未识别许可证。公开可见不等于获得复制、修改或再分发许可。
+- 使用边界：仅借鉴“完整产出链”这一抽象工作流；未复制其 Skill 文本、提示词、代码、模板、前后端实现、示例或资产。
+
+### 2. datawhalechina/intro-mathmodel
+
+- 固定分支与 HEAD：`main` @ `39ca6c9a6e7e53bfbb87315208d893a68459efd2`
+- 固定版本：[datawhalechina/intro-mathmodel@39ca6c9](https://github.com/datawhalechina/intro-mathmodel/tree/39ca6c9a6e7e53bfbb87315208d893a68459efd2)
+- 参考角色：用于研究数学建模知识层的组织方式，包括方法原理、适用条件、数学表达和可运行实现之间的关系。
+- 许可证/版权状态：固定版本根目录仅含 `README.md` 与 `docs/`，未发现许可证文件，GitHub License API 也未识别许可证。
+- 使用边界：未复制、翻译或改写其教程、公式编排、代码和图片；模型选择与验证说明由本项目依据公知数学知识独立撰写。
+
+### 3. zhanwen/MathModel
+
+- 固定分支与 HEAD：`master` @ `cd5be91735ebf11d5ee52eb170e86a6d07131977`
+- 固定版本：[zhanwen/MathModel@cd5be91](https://github.com/zhanwen/MathModel/tree/cd5be91735ebf11d5ee52eb170e86a6d07131977)
+- 参考角色：用于研究历年赛题、论文、模板、算法资料在案例检索、反例检查、复现分级和写作研究中的作用。
+- 许可证/版权状态：固定版本根目录未发现许可证文件，GitHub License API 也未识别许可证；仓库聚合的论文、赛题、课件和模板还可能分别具有不同权利人。
+- 使用边界：未引入其中任何论文、赛题、代码、模板、图片、课件或二进制文件；本项目只独立设计案例使用规范和元数据字段。
+
+### 4. zhnnky329/MathModeling-skills
 
 - 固定分支与 HEAD：`main` @ `046a6e74814c2e5fef72b5ee56305509a8635e1d`
 - 固定版本：[zhnnky329/MathModeling-skills@046a6e7](https://github.com/zhnnky329/MathModeling-skills/tree/046a6e74814c2e5fef72b5ee56305509a8635e1d)
@@ -13,7 +37,7 @@
 - 固定许可证据：[根目录 LICENSE](https://github.com/zhnnky329/MathModeling-skills/blob/046a6e74814c2e5fef72b5ee56305509a8635e1d/LICENSE)
 - 使用边界：本项目没有复制其多 Skill 编排、`SKILL.md` 表述、提示词、代码、示例或资产；阶段语义、G0–G7 门禁和全部契约均为独立设计。
 
-### 2. yushui2022/MathModel-Skill
+### 5. yushui2022/MathModel-Skill
 
 - 固定分支与 HEAD：`master` @ `51054497f052197c3afe434e502e38edb85b2870`
 - 固定版本：[yushui2022/MathModel-Skill@5105449](https://github.com/yushui2022/MathModel-Skill/tree/51054497f052197c3afe434e502e38edb85b2870)
@@ -22,7 +46,7 @@
 - 固定版权证据：[固定版本根目录](https://github.com/yushui2022/MathModel-Skill/tree/51054497f052197c3afe434e502e38edb85b2870)
 - 使用边界：仅借鉴抽象的可恢复工作流和可复现性思想；未复制其 `SKILL.md`、脚本、提示词、Word/OMML 模板、示例论文、图表、数据、发布包或其他资产。
 
-### 3. capwitf/My-MathModeling-skills
+### 6. capwitf/My-MathModeling-skills
 
 - 固定分支与 HEAD：`main` @ `da53b41cab7e25be906f5899488229387e7921c0`
 - 固定版本：[capwitf/My-MathModeling-skills@da53b41](https://github.com/capwitf/My-MathModeling-skills/tree/da53b41cab7e25be906f5899488229387e7921c0)
@@ -44,6 +68,6 @@
 
 ## 未复制声明
 
-本项目对上述三个仓库的使用仅限于概念性调研和事实核对。项目没有复制、翻译、改写或打包上述来源中的受保护文本、提示词、源代码、模板、图表、图片、数据集、论文、赛题、压缩包或其他二进制资产；相关链接仅用于透明记录灵感来源和版权边界。
+本项目对上述六个仓库的使用仅限于概念性调研和事实核对。项目没有复制、翻译、改写或打包上述来源中的受保护文本、提示词、源代码、模板、图表、图片、数据集、论文、赛题、压缩包或其他二进制资产；相关链接仅用于透明记录灵感来源和版权边界。
 
 无明确许可证并不等于可以自由复用。GitHub 对无许可证仓库的说明见：[Licensing a repository](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository)。本文件是保守的工程合规记录，不构成法律意见。

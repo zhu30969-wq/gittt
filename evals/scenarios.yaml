@@ -1,4 +1,4 @@
-schema_version: "1.0.0"
+schema_version: "2.0.0"
 purpose: "Behavioral forward tests for the cumcm-modeling skill"
 scenarios:
   - id: "E01-complete-chain"
@@ -48,3 +48,53 @@ scenarios:
     expected_invariants:
       - "A rule written after the first relevant result is labeled post_result and never described as preregistered."
       - "Every paper percentage, difference, ratio, and sensitivity increment has a registered result metric and numeric assertion."
+  - id: "E10-input-role-preflight"
+    fixture: "mixed-folder-with-data-template-and-instructions"
+    expected_invariants:
+      - "Result templates, instructions, references, and prior outputs are not approved as observations."
+      - "A filename heuristic remains unconfirmed until content or a human review establishes the role."
+      - "Bundled modeling inputs are immutable and appear in the result input ledger with matching hashes."
+  - id: "E11-baseline-evidence"
+    fixture: "primary-and-simple-baseline"
+    expected_invariants:
+      - "The baseline covers every compared question and uses a comparable metric definition."
+      - "Both primary and baseline have eligible runs; the primary result depends on the exact baseline result used."
+      - "Changing baseline evidence makes the comparison and downstream claims stale."
+  - id: "E12-structured-diagnostic"
+    fixture: "diagnostic-with-predeclared-threshold"
+    expected_invariants:
+      - "Every required or conditional validation check has exactly one result diagnostic."
+      - "Observed values and units are evaluated against the predeclared operator and threshold."
+      - "A hand-entered PASS that contradicts the numeric comparison is blocked."
+  - id: "E13-release-pdf"
+    fixture: "release-with-source-but-no-final-pdf"
+    expected_invariants:
+      - "A release requires one hashed application/pdf paper_pdf deliverable and a matching PDF entrypoint."
+      - "The PDF is readable and its current hash is bound by G6 and G7 reviews."
+  - id: "E14-immutable-fallback-promotion"
+    fixture: "partial-primary-trigger-and-promoted-fallback"
+    expected_invariants:
+      - "The original primary, conditional fallback, and partial trigger remain immutable and are bound by a separate promotion event."
+      - "The trigger is recomputed from hashed run bytes, passes every non-trigger result invariant, and cannot itself support a final claim."
+      - "One fallback cannot be activated by multiple immutable events."
+      - "The fallback reruns after promoted_at and the promotion is verified only after the new result becomes eligible."
+  - id: "E15-paper-build-and-proof-package"
+    fixture: "paper-receipt-with-detached-proof"
+    expected_invariants:
+      - "The build receipt binds the exact source/resource tree, dependency log, command, working directory, upstream fingerprints, and final PDF."
+      - "An explicit LaTeX, Typst, or wrapper failure in the build log prevents PAPER_BUILD_RECEIPT_VERIFIED even when exit_code is declared as zero."
+      - "A proof binds its claim ID and proposition, contains an inspectable reasoning structure and conclusion, and a formally proved review receipt binds the exact proof SHA-256."
+      - "The proof is part of the verified consumed paper tree or a required appendix; a handwritten receipt path or detached proof cannot create a proof-only release path."
+  - id: "E16-code-deliverable-closure"
+    fixture: "entrypoint-with-helper-modules"
+    expected_invariants:
+      - "Every code file declared by an experiment supporting release evidence is a required code deliverable."
+      - "Registering only the executable entrypoint does not hide omitted helper modules."
+  - id: "E17-held-out-resume"
+    fixture: "held_out_resume_scenario.json"
+    executable: "run_held_out_resume.py"
+    expected_invariants:
+      - "The harness starts from a target path that does not exist and preserves every generated file for inspection."
+      - "Re-running initialization preserves all existing project bytes and does not create a parallel workflow memory."
+      - "Two read-only audits derive identical workflow_state, last_valid_gate, rollback_target, and next_legal_action values."
+      - "The placeholder project remains outside SUBMISSION_READY and exposes one deterministic non-empty next legal action."

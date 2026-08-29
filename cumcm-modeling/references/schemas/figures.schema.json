@@ -21,6 +21,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "publication_status": {"type": "string", "enum": ["draft", "final", "archived"]},
           "provenance_type": {"type": "string", "enum": ["derived", "conceptual", "external"]},
           "source_result_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
           "source_files": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/fileRef"}},
@@ -36,7 +37,7 @@
               "properties": {
                 "field": {"type": "string", "minLength": 1},
                 "aesthetic": {"type": "string", "minLength": 1},
-                "unit": {"type": "string", "minLength": 1}
+                "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"}
               },
               "required": ["field", "aesthetic", "unit"]
             }
@@ -49,7 +50,7 @@
               "properties": {
                 "name": {"type": "string", "enum": ["x", "y", "z", "color", "size"]},
                 "label": {"type": "string", "minLength": 1},
-                "unit": {"type": "string", "minLength": 1},
+                "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
                 "scale": {"type": "string", "enum": ["linear", "log", "symlog", "categorical", "other"]}
               },
               "required": ["name", "label", "unit", "scale"]
@@ -62,7 +63,7 @@
           "external_source": {"type": ["string", "null"]},
           "license": {"type": ["string", "null"]}
         },
-        "required": ["id", "provenance_type", "source_result_refs", "source_files", "generator_files", "generator_argv", "output", "panels", "encodings", "axes", "caption", "alt_text", "claim_refs", "postprocess", "external_source", "license"],
+        "required": ["id", "publication_status", "provenance_type", "source_result_refs", "source_files", "generator_files", "generator_argv", "output", "panels", "encodings", "axes", "caption", "alt_text", "claim_refs", "postprocess", "external_source", "license"],
         "allOf": [
           {
             "if": {"properties": {"provenance_type": {"const": "derived"}}},

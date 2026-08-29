@@ -36,17 +36,25 @@ question → model → experiment → result → claim → figure/table/paper
 
 结构化 YAML 契约负责稳定 ID、依赖、散列和证据引用；Markdown 与论文源码负责推导和解释。契约通过只能说明声明的证据结构通过检查，不能替代数学推导或现实判断。
 
-## 三个来源如何融合
+## 六个来源如何融合
 
-本次整合比较的是三个数学建模 Skill 仓库的工作流、触发边界、产物和验证策略，不把三个目录机械拼接为一个 Skill：
+原有三套资源先形成“执行—知识—案例”基础层；后续三套 Skill 再补入“决策门禁—可恢复生产—独立核验”。本项目只融合可迁移的抽象能力，不把六个目录机械拼接，也不复制无明确许可的文本、代码、论文或资产。
+
+| 原有来源范式 | 保留的核心能力 | 本项目中的可执行落点 |
+|---|---|---|
+| [jihe520/MathModelAgent](https://github.com/jihe520/MathModelAgent) 的端到端执行层 | 题意分析、模型设计、计算绘图、中文写作与最终验收的连续产出链 | 单入口状态机、阶段产物契约、`problem → model → experiment → result → paper` 路径和论文 lint |
+| [datawhalechina/intro-mathmodel](https://github.com/datawhalechina/intro-mathmodel) 的知识层 | 数学方法原理、适用条件与 Python 实现的系统学习视角 | 按问题结构选择模型、题型特异验证计划和渐进式参考路由；不内置算法名套题表 |
+| [zhanwen/MathModel](https://github.com/zhanwen/MathModel) 的案例层 | 历年题目、论文、模板和算法资料的案例研究价值 | 独立判断优先的案例卡、结构化检索、可迁移/不可迁移边界和复现等级 |
+
+后续三套 Skill 提供可靠性升级：
 
 | 来源范式 | 保留的核心能力 | 本项目中的可执行落点 | 有意不沿用的设计 |
 |---|---|---|---|
-| [zhnnky329/MathModeling-skills](https://github.com/zhnnky329/MathModeling-skills) 的人类决策门禁 | 模型中立的问题解析、可用基线、方法特异失败探针、冻结与回退 | [模型选择](cumcm-modeling/references/model-selection.md)、[G0–G7 工作流](cumcm-modeling/references/workflow.md)、绑定指纹的人工 review | 多入口 Skill 路由、只存在于提示词中的软门禁 |
-| [yushui2022/MathModel-Skill](https://github.com/yushui2022/MathModel-Skill) 的可恢复生产流水线 | 断点恢复、SHA-256 新鲜度、运行账本、论文交付与 CI | project manifest、[审计器](cumcm-modeling/scripts/audit_project.py)、CAS 写入、release fixture、Ubuntu/Windows CI、[可选 Word 派生交付](cumcm-modeling/references/paper-delivery.md) | 题型到算法的固定映射、按篇幅机械扩写、重复维护一份独立 memory 状态 |
-| [capwitf/My-MathModeling-skills](https://github.com/capwitf/My-MathModeling-skills) 的证据与核验工具箱 | 数学与数值诊断、条件性验证、结论—结果—图表关系、跨媒体一致性 | [验证规范](cumcm-modeling/validation.md)、9 个 JSON Schema、联合证据 DAG、论文 claim marker 与严格 lint | 任意代码行数门槛、需要手工同步的大量平行登记表 |
+| [zhnnky329/MathModeling-skills](https://github.com/zhnnky329/MathModeling-skills) 的人类决策门禁 | 模型中立的问题解析、可用基线、方法特异失败探针、冻结与回退 | 结构化 `method_selection`、基线依赖与实际运行门禁、题型验证 check、[G0–G7 工作流](cumcm-modeling/references/workflow.md) | 多入口 Skill 路由、只存在于提示词中的软门禁 |
+| [yushui2022/MathModel-Skill](https://github.com/yushui2022/MathModel-Skill) 的可恢复生产流水线 | 输入预检、断点恢复、SHA-256 新鲜度、运行账本、论文交付与 CI | 内容驱动的输入角色、project manifest、CAS 写入、必需最终 PDF、release fixture、Ubuntu/Windows CI | 用扩展名/文件名自动批准输入、固定算法映射、重复 memory 状态 |
+| [capwitf/My-MathModeling-skills](https://github.com/capwitf/My-MathModeling-skills) 的证据与核验工具箱 | 数学与数值诊断、条件性验证、结论—结果—图表关系、跨媒体一致性 | 结构化 diagnostic、预声明阈值回算、eligible figure 来源、11 个 JSON Schema、联合证据 DAG 与严格 lint | 任意代码行数门槛、需要手工同步的大量平行登记表 |
 
-在三者基础上，本项目新增单入口状态机、稳定 typed ID、完整 `question → model → experiment → result → claim → paper` 路径、依赖闭包失效传播、派生数字逐项登记、并发侧车锁、三人交叉复核和独立前向测试。`manifest.yaml` 是恢复状态的单一事实源，审计器根据当前字节重建门禁状态，避免另一份 workflow memory 与证据文件发生漂移。
+在三者基础上，本项目新增单入口状态机、稳定 typed ID、完整 `question → model → experiment → result → claim → paper` 路径、依赖闭包失效传播、派生数字逐项登记、并发侧车锁、三人交叉复核和独立前向测试。`manifest.yaml` 是恢复状态的单一事实源，审计器根据当前字节重建门禁状态，并输出 `workflow_state`、`last_valid_gate`、`rollback_target` 与 `next_legal_action`，避免另一份 workflow memory 与证据文件发生漂移。release 会签以三人 approval set 表达，G7 共同绑定当前 `snapshot:release`，单人 PASS 不能冻结发布包。
 
 本仓库独立设计指令、Schema、脚本、夹具和文档。来源版本、许可证核查与使用边界统一记录在 [THIRD_PARTY_SOURCES.md](THIRD_PARTY_SOURCES.md)，README 不重复维护容易失真的版本或许可结论。
 
@@ -89,6 +97,19 @@ question → model → experiment → result → claim → figure/table/paper
 
 案例用于检查遗漏、比较验证方法和寻找反例，不能替当前题目的数据作决定。
 
+### 前置筛选与结构化诊断
+
+- 输入先分类为原始数据、结果模板、说明、参考资料或派生数据；仅靠文件名推测的角色不能被批准用于建模；
+- primary model 必须登记选择理由、可用 baseline 或经 G2 人工复核的豁免理由；
+- 声明 baseline 后必须存在同子问、同指标口径的实验和 eligible result，主结果还要把实际 baseline result 纳入依赖与指纹闭包；
+- prediction、optimization、simulation、evaluation 等模型族必须逐项考虑各自的泄漏、可行性、收敛、稳定性等检查；
+- 每个 required/conditional check 在成功结果中只能对应一个 diagnostic；带数值阈值时状态由审计器重算；
+- fallback 通过独立 `model_promotion` 事件晋升，旧主模型、条件 fallback 和 partial trigger 保持不可变；partial trigger 必须通过除精确触发项外的完整结果契约，同一 fallback 不得被多个事件重复激活，新路线必须在晋升后重跑并产生 eligible result；
+- derived figure 只能引用 eligible result，release 图表只能绑定 final claim；
+- release 覆盖每个证据实验的全部 `code_files`；证明必须绑定 claim ID、登记命题、推理结构和结论，正式证明回执还要绑定准确 proof SHA-256，并进入经验证的论文构建闭包或 required appendix；
+- `paper_build` 收据绑定实际源码树、recorder 观察到的资源、构建命令、工作目录、日志、依赖记录和最终 PDF，且构建时间晚于最新晋升；明确失败的 LaTeX/Typst 日志不得签发 VERIFIED，仅在收据中声明资源也不会产生 `PROOF_PACKAGED`；
+- release 同时要求 canonical 论文源码和唯一、已哈希、可读取的最终 PDF。
+
 ## 仓库结构
 
 ~~~text
@@ -117,10 +138,19 @@ cumcm-modeling/
 tests/
 ├── build_release_fixture.py
 ├── test_audit_regressions.py
+├── test_audit_snapshot_security.py
+├── test_build_and_proof_receipts.py
+├── test_contract_parsing.py
 ├── test_lint_regressions.py
+├── test_lock_sidecar_security.py
 ├── test_path_safety.py
 ├── test_write_concurrency.py
 └── fixtures/
+
+evals/
+├── scenarios.yaml
+├── held_out_resume_scenario.json
+└── run_held_out_resume.py
 ~~~
 
 ## 安装
@@ -245,7 +275,7 @@ python -X utf8 cumcm-modeling/scripts/init_project.py ./work/cumcm-a \
 python -X utf8 cumcm-modeling/scripts/audit_project.py ./work/cumcm-a
 ~~~
 
-生成新的 JSON 报告：
+生成新的 JSON 报告；报告同时包含确定性恢复状态和下一合法动作：
 
 ~~~bash
 python -X utf8 cumcm-modeling/scripts/audit_project.py ./work/cumcm-a \
@@ -286,6 +316,14 @@ deliverables:
     path: paper/main.tex
     sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     required: true
+    role: paper_source
+    media_type: application/x-tex
+  - id: deliverable:paper-pdf
+    path: paper/main.pdf
+    sha256: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+    required: true
+    role: paper_pdf
+    media_type: application/pdf
 ~~~
 
 上面的散列只演示字段形状，必须替换成对应文件的真实值。typed ID 必须匹配 **type:name** 形式：类型以小写字母开头，之后可含小写字母、数字、下划线或连字符；冒号后的名称必须以小写字母或数字开头，之后只可含小写字母、数字、点、下划线或连字符。SHA-256 必须是恰好 64 位的小写十六进制。**manifest.py --write** 不会刷新 **environment_files** 或 **deliverables**，这些条目需要在文件最终确定后显式计算并更新，审计会核对其当前字节。
@@ -306,7 +344,7 @@ python -X utf8 cumcm-modeling/scripts/manifest.py .\work\cumcm-a `
 
 ### 4. 记录人工门禁复核
 
-**record_gate_review.py** 只追加一条人工或混合复核，不会覆盖旧记录，也不会替自动 BLOCK 或 STALE 作决定。PASS 复核必须同时给出至少一个 typed evidence ID 和对应工件指纹。以下示例先绑定当前 problem spec 与 review log，再提交 G1 复核：
+**record_gate_review.py** 只追加一名成员在一个不可变 approval set 中的人工或混合签核，不会覆盖旧记录，也不会替自动 BLOCK 或 STALE 作决定。PASS 签核必须同时给出至少一个 typed evidence ID 和对应工件指纹；`member_id` 与显示名必须已在 review log 的 `team_members` 中登记。以下示例先绑定当前 problem spec 与 review log，再提交 G1 的第一名成员签核：
 
 ~~~powershell
 $project = '.\work\cumcm-a'
@@ -316,15 +354,17 @@ python -X utf8 cumcm-modeling/scripts/record_gate_review.py $project `
   --gate G1 `
   --decision PASS `
   --basis human `
+  --approval-set-id approval:g1-problem-v1 `
+  --member-id member:modeler `
   --reviewer '队员甲' `
   --rationale '题意、单位、边界和交付目标已逐项复核' `
   --evidence problem:main `
   --fingerprint "problem:main=$problemSha" `
   --expected-log-sha256 $reviewLogSha `
-  --review-id review:g1-problem-v1
+  --review-id review:g1-modeler-problem-v1
 ~~~
 
-先增加 **--dry-run** 可只验证候选记录。写入成功后命令返回新的 review log SHA-256；随后需要显式运行 manifest 更新流程，使 manifest 中的 gate-review artifact 散列与新日志一致。
+同一轮的其余成员应使用相同的 **approval:g1-problem-v1**、各自不同的 `member_id` 和 review ID 重复签核；G1 只有三人全签并绑定相同当前证据后才完整。先增加 **--dry-run** 可只验证候选记录。写入成功后命令返回新的 review log SHA-256；随后需要显式运行 manifest 更新流程，使 manifest 中的 gate-review artifact 散列与新日志一致。
 
 #### 并发写入与侧车锁
 
@@ -356,7 +396,7 @@ python -X utf8 cumcm-modeling/scripts/lint_paper.py ./work/cumcm-a \
   --strict
 ~~~
 
-如已有编译 PDF，可增加 **--pdf paper/main.pdf**。页面上限不是内置常量；需要时通过 **--max-pages** 显式提供。
+草稿阶段如已有编译 PDF，可增加 **--pdf paper/main.pdf**。release 阶段 PDF 不是可选项：必须同时写入 `entrypoints.pdf` 和唯一的 required `paper_pdf` deliverable。页面上限不是内置常量；需要时通过 **--max-pages** 显式提供。
 
 ### 可选 Word 派生交付
 
@@ -426,4 +466,4 @@ python -X utf8 cumcm-modeling/scripts/manifest.py ./synthetic-release
 python -X utf8 cumcm-modeling/scripts/audit_project.py ./synthetic-release
 ~~~
 
-夹具完全由本项目生成，不包含第三方赛题或论文内容。CI 还会运行 Skill metadata 快速验证、全部 Python 文件编译、JSON Schema 自校验、完整 **unittest discover** 回归测试和 Windows 并发/路径 smoke；合成 release 审计只有整体状态严格等于 PASS 才通过。
+夹具完全由本项目生成，不包含第三方赛题或论文内容。CI 在 Linux 的 Python 3.10 与 3.12 上运行 Skill metadata 验证、全部 Python 文件编译、JSON Schema 自校验、完整 **unittest discover**、论文正反向 lint 和合成 release；Windows 还会重跑完整单测及 release/PDF 审计。合成 release 只有 G0–G7 整体状态严格等于 PASS 才通过。

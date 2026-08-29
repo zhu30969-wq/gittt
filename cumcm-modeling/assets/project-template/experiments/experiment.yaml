@@ -1,4 +1,4 @@
-schema_version: 1.0.0
+schema_version: 2.0.0
 kind: experiment
 id: experiment:main
 revision: 1
@@ -29,20 +29,25 @@ repetitions: 1
 parameters: {}
 split_strategy: "不适用时说明原因；预测任务必须写明时间或样本切分。"
 baseline_refs: []
+baseline_comparison_rules: []
 metrics:
   - id: metric:primary
     name: primary_metric
     direction: descriptive
     unit: "1"
     aggregation: "说明聚合方法。"
+    source_output_ref: output:primary
+    extractor:
+      type: json_pointer
+      pointer: /value
 acceptance_rules: []
 outputs:
   - id: output:primary
     path: outputs/result.json
     required: true
     comparator:
-      type: json_numeric
-      absolute_tolerance: 0.0
-      relative_tolerance: 0.0
+      type: existence
+      expected_sha256: null
+      reference_file: null
 timeout_seconds: 600
 resource_note: "记录预计运行环境和资源需求。"

@@ -1,4 +1,4 @@
-schema_version: 1.0.0
+schema_version: 2.0.0
 kind: model_spec
 id: model:main
 revision: 1
@@ -11,7 +11,16 @@ problem_ref: problem:main
 addresses: [question:q1]
 role: primary
 model_family: descriptive
+method_selection:
+  decision: selected
+  rationale: "替换为基于任务输出、数据条件、假设、计算预算和失败代价的选择理由。"
+  baseline_policy:
+    status: waived
+    model_refs: []
+    rationale: "当前只是初始化占位；正式建模时应建立可用基线，确实不适用时由 G2 人工说明。"
+  alternatives: []
 assumption_refs: [assumption:a1]
+constraint_refs: []
 symbols:
   - id: symbol:x
     name: x
@@ -31,10 +40,20 @@ algorithm:
   termination: "替换为停止条件或确定性完成条件。"
   complexity_note: "可选：记录主要时间/空间复杂度或计算预算。"
 validation_plan:
-  methods: ["至少加入一个与题型相适配的验证方法。"]
-  failure_criteria: ["明确什么现象会推翻或限制该模型。"]
+  checks:
+    - id: check:input-integrity
+      check_type: input_integrity
+      applicability: required
+      activation_condition: null
+      criticality: blocking
+      rationale: "确认正式输入与题面语义一致，排除结果模板、说明文件和旧产物。"
+      procedure: "核对输入角色、字段、单位、缺失值、异常值、重复记录和原始文件散列。"
+      pass_rule: "全部正式输入完成内容核验且没有未解决的阻断性数据问题。"
+      threshold: null
+      failure_response: return_to_modeling
   human_review_required: true
 sensitivity_plan: []
 applicability: "说明模型成立的数据范围、时间范围和对象范围。"
 failure_modes: ["记录至少一种模型可能失效的情形。"]
 fallback_models: []
+fallback_rules: []

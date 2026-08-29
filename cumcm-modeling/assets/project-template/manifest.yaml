@@ -1,4 +1,4 @@
-schema_version: 1.0.0
+schema_version: 2.0.0
 kind: manifest
 id: manifest:project
 revision: 1
@@ -11,7 +11,9 @@ manifest_type: project
 project_id: __PROJECT_ID__
 competition_profile:
   enabled: false
+  id: null
   path: null
+  sha256: null
   note: "论文格式 profile 为可配置检查；启用前必须依据当年官方规则人工确认。"
 artifacts:
   - id: problem:main
@@ -43,7 +45,7 @@ artifacts:
     path: claims/claims.yaml
     sha256: __AUTO_SHA256__
     required: true
-    depends_on: [result:main]
+    depends_on: [problem:main, result:main]
   - id: figures:main
     kind: figures
     path: figures/figures.yaml

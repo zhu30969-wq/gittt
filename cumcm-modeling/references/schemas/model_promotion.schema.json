@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model_promotion.schema.json",
+  "title": "CUMCM immutable fallback-promotion event",
+  "allOf": [{"$ref": "common.schema.json#/$defs/artifactBase"}],
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "kind": {"const": "model_promotion"},
+    "id": {"$ref": "common.schema.json#/$defs/typedId"},
+    "revision": {"type": "integer"},
+    "lifecycle_status": {"$ref": "common.schema.json#/$defs/lifecycleStatus"},
+    "depends_on": {
+      "type": "array",
+      "minItems": 3,
+      "items": {"$ref": "common.schema.json#/$defs/typedId"},
+      "uniqueItems": true
+    },
+    "provenance": {"$ref": "common.schema.json#/$defs/provenance"},
+    "extensions": {"type": "object"},
+    "status": {"const": "activated"},
+    "source_fallback_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "replaces_primary_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "trigger_result_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "trigger_diagnostic_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+    "fingerprints": {
+      "type": "object",
+      "minProperties": 3,
+      "additionalProperties": {"$ref": "common.schema.json#/$defs/sha256"},
+      "propertyNames": {"$ref": "common.schema.json#/$defs/typedId"}
+    },
+    "promoted_at": {"type": "string", "format": "date-time"},
+    "approved_by": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+    "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+  },
+  "required": [
+    "status",
+    "source_fallback_ref",
+    "replaces_primary_ref",
+    "trigger_result_ref",
+    "trigger_diagnostic_ref",
+    "fingerprints",
+    "promoted_at",
+    "approved_by",
+    "rationale"
+  ],
+  "unevaluatedProperties": false
+}

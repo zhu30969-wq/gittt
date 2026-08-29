@@ -84,6 +84,8 @@ WAIT_INPUT 是暂停原因，不是跳过阶段的通道。缺输入时记录所
 
 WAIT_G0 至 WAIT_G7 只有在对应人工 review 为 PASS，且自动审计不存在 BLOCK、ENV_BLOCK 或 STALE 时才能退出。人工 PASS 不能抵消机器发现的硬错误；机器检查通过也不能代替人工判断。
 
+release 中的门禁批准按 `approval_set_id` 聚合。需要交叉复核的门禁必须由不同 `member_id` 对完全相同的证据指纹分别签核；G7 由三名成员共同签核并绑定当前 `snapshot:release`。审计器只接受当前且完整的 approval set，不以数组中最后一条单人 PASS 代替团队决定。
+
 ### G0：输入确认
 
 确认当前题面、题号、附件、数据版本和已有项目材料互相对应，输入清单及散列完整。G0 只确认“用的是哪一组材料”，不证明文件内容正确。
@@ -189,6 +191,8 @@ WAIT_G0 至 WAIT_G7 只有在对应人工 review 为 PASS，且自动审计不�
 - 到达 G4 后，除非发现实质错误，不再引入新算法；正式赛模式尤其应保护写作和最终检查时间。
 
 ## 状态汇报格式
+
+审计器从当前门禁、硬失败和失效根确定性派生四个恢复字段：`workflow_state`、`last_valid_gate`、`rollback_target` 和 `next_legal_action`。`last_valid_gate` 是从 G0 起连续有效的最后门禁；存在 `BLOCK`、`ENV_BLOCK` 或 `STALE` 时，`rollback_target` 指向最早失败门禁对应的工作状态，`workflow_state` 与之对齐。没有硬失败但仍有未批准门禁时停在对应 `WAIT_Gn`；release 的 G0–G7 全部有效后才是 `SUBMISSION_READY`，非 release 项目即使阶段证据齐全也停在 `RELEASE_QA`。续做项目必须使用这些派生字段，不重新初始化或凭文件存在猜测进度。
 
 每次推进后至少报告：
 

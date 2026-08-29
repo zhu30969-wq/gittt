@@ -1,0 +1,15 @@
+{
+  "schema_version": "2.0.0",
+  "id": "E17-held-out-resume",
+  "project_id": "project:held-out-resume",
+  "mutation": {
+    "path": "specs/problem_spec.yaml",
+    "append_text": "\n# held-out resume sentinel: initializer must preserve this byte sequence\n"
+  },
+  "expected_report_fields": [
+    "workflow_state",
+    "last_valid_gate",
+    "rollback_target",
+    "next_legal_action"
+  ]
+}

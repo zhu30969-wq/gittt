@@ -41,6 +41,11 @@
             "items": {"$ref": "common.schema.json#/$defs/typedId"},
             "uniqueItems": true
           },
+          "deliverable_refs": {
+            "type": "array",
+            "items": {"$ref": "common.schema.json#/$defs/typedId"},
+            "uniqueItems": true
+          },
           "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
           "counterevidence": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/artifactRef"}},
           "numeric_assertions": {
@@ -51,35 +56,63 @@
               "properties": {
                 "metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
                 "reported_value": {"type": "number"},
+                "source_token": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+                "rendered_token": {"$ref": "common.schema.json#/$defs/nonBlankString"},
                 "absolute_tolerance": {"type": "number", "minimum": 0},
                 "relative_tolerance": {"type": "number", "minimum": 0},
-                "unit": {"type": "string", "minLength": 1}
+                "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"}
               },
-              "required": ["metric_ref", "reported_value", "absolute_tolerance", "relative_tolerance", "unit"]
+              "required": ["metric_ref", "reported_value", "source_token", "rendered_token", "absolute_tolerance", "relative_tolerance", "unit"]
             }
           },
           "proof_artifact": {"oneOf": [{"$ref": "common.schema.json#/$defs/fileRef"}, {"type": "null"}]},
-          "paper_markers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "paper_markers": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/nonBlankString"}, "uniqueItems": true},
           "human_review": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "status": {"$ref": "common.schema.json#/$defs/validationStatus"},
-              "reviewer": {"type": ["string", "null"]},
-              "rationale": {"type": "string", "minLength": 1}
+              "reviewer": {"oneOf": [{"$ref": "common.schema.json#/$defs/nonBlankString"}, {"type": "null"}]},
+              "rationale": {"$ref": "common.schema.json#/$defs/nonBlankString"}
             },
             "required": ["status", "reviewer", "rationale"]
           }
         },
-        "required": ["id", "statement", "claim_type", "epistemic_status", "publication_status", "scope", "evidence_refs", "assumption_refs", "limitations", "counterevidence", "numeric_assertions", "proof_artifact", "paper_markers", "human_review"],
+        "required": ["id", "statement", "claim_type", "epistemic_status", "publication_status", "scope", "evidence_refs", "assumption_refs", "deliverable_refs", "limitations", "counterevidence", "numeric_assertions", "proof_artifact", "paper_markers", "human_review"],
         "allOf": [
           {
             "if": {"properties": {"publication_status": {"const": "final"}}},
-            "then": {"properties": {"evidence_refs": {"minItems": 1}, "paper_markers": {"minItems": 1}}}
+            "then": {
+              "properties": {
+                "paper_markers": {"minItems": 1},
+                "deliverable_refs": {"minItems": 1},
+                "human_review": {
+                  "properties": {
+                    "status": {"const": "PASS"},
+                    "reviewer": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+                  }
+                }
+              }
+            }
           },
           {
             "if": {"properties": {"epistemic_status": {"const": "formally_proved"}}},
             "then": {"properties": {"proof_artifact": {"$ref": "common.schema.json#/$defs/fileRef"}}}
+          },
+          {
+            "if": {
+              "properties": {
+                "publication_status": {"const": "final"},
+                "claim_type": {"const": "theoretical"}
+              },
+              "required": ["publication_status", "claim_type"]
+            },
+            "then": {
+              "properties": {
+                "epistemic_status": {"enum": ["analytically_derived", "formally_proved"]},
+                "proof_artifact": {"$ref": "common.schema.json#/$defs/fileRef"}
+              }
+            }
           }
         ]
       }

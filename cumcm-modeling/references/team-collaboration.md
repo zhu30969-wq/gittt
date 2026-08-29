@@ -92,6 +92,8 @@ CUMCM 团队通常由三人共同完成。角色用于明确首责和复核，�
 
 Agent 只能把门禁写成待批准或记录用户明确给出的批准，不能代替成员签字。
 
+release 签核不是一条可转交的单人记录。团队先在 review log 的 `team_members` 登记三个稳定成员 ID，再由不同成员用同一个 `approval_set_id` 对同一组证据分别签核。审计器按 approval set 验证成员身份、人数、角色分离和指纹一致性；G7 还必须共同绑定当前 `snapshot:release`。任何成员、证据或发布范围变化都需要建立新的 approval set，不能在旧集合中补写一条记录冒充重新会签。
+
 ## 并行工作的边界
 
 适合并行：
@@ -120,8 +122,8 @@ from_role: computation
 to_role: synthesis
 state: VALIDATING
 artifacts:
-  - id: result-main
-    hash: pending
+  - id: result:main
+    sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 run_ids: []
 checks_passed: []
 known_failures: []
@@ -129,7 +131,7 @@ open_questions: []
 requested_acknowledgement: true
 ~~~
 
-散列、运行 ID 和检查项必须填写实际值，不能保留示例占位符后进入下一门禁。
+上面的 SHA-256 仅演示字段形状。散列、运行 ID 和检查项必须替换为实际值，不能保留示例值后进入下一门禁；artifact ID 必须使用 `type:name` 形式的 typed ID。
 
 ## 分歧解决
 

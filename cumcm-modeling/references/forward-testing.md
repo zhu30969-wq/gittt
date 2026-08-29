@@ -12,6 +12,14 @@
 6. 至少保留一组从未用于调试的 held-out 场景；
 7. 测试不得自动删除成批文件，临时目录留存并报告位置。
 
+仓库提供一个可执行的离线恢复场景：
+
+```bash
+python -X utf8 evals/run_held_out_resume.py <new-target-path>
+```
+
+目标路径必须尚不存在。该 harness 初始化最小项目、加入中断恢复标记、再次调用初始化器并核对所有文件字节未被覆盖，随后用两个独立报告验证 `workflow_state`、`last_valid_gate`、`rollback_target` 和 `next_legal_action` 的确定性。项目和报告全部保留，脚本不删除文件。
+
 ## P0 行为场景
 
 | 场景 | 必须观察到的行为 |

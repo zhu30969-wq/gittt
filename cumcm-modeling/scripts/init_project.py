@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -35,6 +36,54 @@ except ImportError as exc:  # pragma: no cover - exercised when dependencies are
         )
     )
     raise SystemExit(11)
+
+
+SCHEMA_VERSION_RE = re.compile(r"^2\.[0-9]+\.[0-9]+$")
+
+
+def validate_template_contracts(template_root: Path) -> list[str]:
+    """Preflight every manifest-owned contract before creating target files.
+
+    Custom template roots are supported, but an old 1.x contract tree must be
+    migrated explicitly.  Running this check before ``target.mkdir`` prevents
+    a rejected template from leaving a partially initialized project.
+    """
+
+    errors: list[str] = []
+    manifest_path = template_root / "manifest.yaml"
+    if not manifest_path.is_file():
+        return ["template manifest.yaml is missing"]
+    try:
+        manifest = load_yaml(manifest_path)
+    except Exception as exc:
+        return [f"template manifest.yaml cannot be read: {exc}"]
+    if not isinstance(manifest, dict) or manifest.get("kind") != "manifest":
+        return ["template manifest.yaml is not a manifest contract"]
+    if not isinstance(manifest.get("schema_version"), str) or not SCHEMA_VERSION_RE.fullmatch(manifest["schema_version"]):
+        errors.append("template manifest schema_version must be 2.x.x")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append("template manifest artifacts must be a non-empty list")
+        return errors
+    for index, row in enumerate(artifacts):
+        if not isinstance(row, dict) or not isinstance(row.get("path"), str):
+            errors.append(f"template manifest artifacts[{index}] has no valid path")
+            continue
+        try:
+            artifact_path = safe_project_path(template_root, row["path"], must_exist=True)
+            document = load_yaml(artifact_path)
+        except Exception as exc:
+            errors.append(f"template artifact {row.get('path')!r} cannot be read: {exc}")
+            continue
+        if not isinstance(document, dict):
+            errors.append(f"template artifact {row['path']!r} is not a contract mapping")
+            continue
+        version = document.get("schema_version")
+        if not isinstance(version, str) or not SCHEMA_VERSION_RE.fullmatch(version):
+            errors.append(f"template artifact {row['path']!r} schema_version must be 2.x.x")
+        if document.get("id") != row.get("id") or document.get("kind") != row.get("kind"):
+            errors.append(f"template artifact {row['path']!r} id/kind differs from its manifest row")
+    return errors
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,6 +120,22 @@ def main() -> int:
     if not template_root.is_dir():
         print(json.dumps({"status": "ENV_BLOCK", "message": f"template directory not found: {template_root}"}, ensure_ascii=False))
         return 11
+
+    template_errors = validate_template_contracts(template_root)
+    if template_errors:
+        print(
+            json.dumps(
+                {
+                    "status": "BLOCK",
+                    "code": "TEMPLATE_CONTRACT_INVALID",
+                    "message": "template contract preflight failed",
+                    "errors": template_errors,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 10
 
     target = args.target.resolve()
     # The manifest is handled last because it locks hashes of the other files.
