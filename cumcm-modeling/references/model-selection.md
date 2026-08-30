@@ -62,6 +62,48 @@
 
 ## 条件性判断
 
+下表是审计器的强制口径；Agent 应在 G2 之前依据已经确定的 `model_family` 与 `task_type` 填写 `validation_plan.checks`，不适用的检查也要显式标为 `not_applicable` 并写明理由，不要等审计出现 `BLOCK` 后再补。
+
+<!-- BEGIN GENERATED: validation-matrix -->
+### 审计器验证覆盖决策表
+
+> 本块由 `scripts/export_validation_matrix.py` 生成；映射取自审计器常量，合法取值与行顺序取自 Schema。不要手工编辑。
+
+#### 模型族 → 必须考虑的 checks
+
+| `model_family` | `validation_plan.checks` 必须考虑 |
+|---|---|
+| `descriptive` | `input_integrity` |
+| `statistical` | `uncertainty`、`residual_diagnostics` |
+| `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
+| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`sensitivity` |
+| `simulation` | `convergence`、`conservation_balance`、`numerical_stability`、`boundary_case` |
+| `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
+| `causal` | `uncertainty`、`identifiability`、`falsification` |
+| `hybrid` | —（无族级强制检查；仍可能受任务级与公式级约束） |
+| `other` | —（无族级强制检查；仍可能受任务级与公式级约束） |
+
+#### 任务类型 → 必须考虑的 checks
+
+| `task_type` | `validation_plan.checks` 必须考虑 |
+|---|---|
+| `description` | `input_integrity` |
+| `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
+| `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
+| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`sensitivity` |
+| `mechanism` | `dimensional_consistency`、`sensitivity`、`boundary_case` |
+| `decision` | `baseline_comparison`、`sensitivity` |
+| `other` | —（无任务级强制检查；仍可能受族级与公式级约束） |
+
+当 `formulation.equations`、`objectives` 或 `constraints` 中任一列表非空时，审计器还会叠加公式级检查：`dimensional_consistency`、`domain_validity`、`formula_back_substitution`。
+
+#### 当前覆盖盲区
+
+- **无族级映射的 `model_family`**：`hybrid`、`other`。这两类模型在族—任务映射中只剩任务级约束；若包含公式，仍会叠加上述公式级检查。
+- **无任务级映射的 `task_type`**：`other`。该任务类型不受任务级 check 覆盖约束，仍可能受模型族与公式级约束。
+- **未被族、任务或公式规则自动要求的 `validationCheckType`**：`seed_stability`、`reproducibility`、`other`。其中 `seed_stability` 对随机算法是关键检查，目前完全依赖人工在 `validation_plan.checks` 中主动声明；`reproducibility` 与 `other` 同样不会被自动补入。
+<!-- END GENERATED: validation-matrix -->
+
 条件性判断必须转成 `validation_plan.checks`，不能只留在论文写作清单里。每项检查预先声明适用性、阻断性、过程、通过规则、可选数值阈值和失败响应；运行后由 `results.diagnostics` 一对一报告。`not_applicable` 表示团队明确判断该检查不适用，不等于忘记填写。
 
 ### 预测与推断

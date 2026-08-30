@@ -55,7 +55,7 @@ description: "Orchestrate, continue, or audit CUMCM（全国大学生数学建�
 - 选择 `focused`、`competition-fast`、`release-strict` 或 `audit`：读取 [工作方式](references/profiles.md)。
 - 新建、续做、回退或查询状态：读取 [工作流](references/workflow.md)。
 - 创建或检查项目文件、ID、散列与追溯关系：读取 [产物契约](references/contracts.md)。
-- 形成候选模型或判断是否套模：读取 [模型选择](references/model-selection.md)。
+- 形成候选模型或判断是否套模：读取 [模型选择](references/model-selection.md)。确定 `model_family` 与 `task_type` 后，先读其中的验证覆盖表并把对应 check 写入 `validation_plan.checks`，不要等审计出现 `BLOCK` 后再补。
 - 使用历年题目、优秀论文或案例元数据：读取 [案例使用](references/case-use.md)。只有案例检索或比较任务才读取 `references/cases/`。
 - 编写代码、运行实验、检查结果可信度：读取 [验证规范](validation.md)。
 - 组织三人分工、交接、冲突解决或审批：读取 [团队协作](references/team-collaboration.md)。
