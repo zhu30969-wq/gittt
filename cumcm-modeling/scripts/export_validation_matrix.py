@@ -45,6 +45,7 @@ class ValidationMatrix:
 
     check_types: tuple[str, ...]
     model_families: tuple[str, ...]
+    validation_facets: tuple[str, ...]
     task_types: tuple[str, ...]
     family_coverage: Mapping[str, frozenset[str]]
     task_coverage: Mapping[str, frozenset[str]]
@@ -54,6 +55,12 @@ class ValidationMatrix:
     def family_gaps(self) -> tuple[str, ...]:
         return tuple(
             value for value in self.model_families if value not in self.family_coverage
+        )
+
+    @property
+    def facet_gaps(self) -> tuple[str, ...]:
+        return tuple(
+            value for value in self.validation_facets if value not in self.family_coverage
         )
 
     @property
@@ -172,6 +179,11 @@ def load_validation_matrix() -> ValidationMatrix:
     model_families = _string_enum(
         model_schema, ("properties", "model_family", "enum"), MODEL_SCHEMA_PATH
     )
+    validation_facets = _string_enum(
+        model_schema,
+        ("properties", "validation_facets", "items", "enum"),
+        MODEL_SCHEMA_PATH,
+    )
     task_types = _string_enum(
         problem_schema,
         ("properties", "questions", "items", "properties", "task_type", "enum"),
@@ -192,6 +204,8 @@ def load_validation_matrix() -> ValidationMatrix:
     formula_checks = frozenset(FORMULA_VALIDATION_CHECKS)
 
     unknown_families = set(family_coverage).difference(model_families)
+    unmapped_facets = set(validation_facets).difference(family_coverage)
+    unselectable_family_mappings = set(family_coverage).difference(validation_facets)
     unknown_tasks = set(task_coverage).difference(task_types)
     mapped_checks = set(formula_checks)
     for checks in (*family_coverage.values(), *task_coverage.values()):
@@ -200,6 +214,16 @@ def load_validation_matrix() -> ValidationMatrix:
     problems: list[str] = []
     if unknown_families:
         problems.append(f"unknown model_family keys: {sorted(unknown_families)}")
+    if unmapped_facets:
+        problems.append(
+            "validation_facets values without family mappings: "
+            f"{sorted(unmapped_facets)}"
+        )
+    if unselectable_family_mappings:
+        problems.append(
+            "family mappings absent from validation_facets: "
+            f"{sorted(unselectable_family_mappings)}"
+        )
     if unknown_tasks:
         problems.append(f"unknown task_type keys: {sorted(unknown_tasks)}")
     if unknown_checks:
@@ -210,6 +234,7 @@ def load_validation_matrix() -> ValidationMatrix:
     return ValidationMatrix(
         check_types=check_types,
         model_families=model_families,
+        validation_facets=validation_facets,
         task_types=task_types,
         family_coverage=family_coverage,
         task_coverage=task_coverage,
@@ -244,7 +269,7 @@ def render_markdown(matrix: ValidationMatrix | None = None) -> str:
         cell = (
             _code_list(list(_ordered_checks(matrix, checks)))
             if checks is not None
-            else "—（无族级强制检查；仍可能受任务级与公式级约束）"
+            else "由必填的 `validation_facets` 所选模型族检查取并集（仍叠加任务级与公式级约束）"
         )
         lines.append(f"| `{family}` | {cell} |")
 
@@ -274,11 +299,14 @@ def render_markdown(matrix: ValidationMatrix | None = None) -> str:
             + _code_list(list(formula_checks))
             + "。",
             "",
-            "#### 当前覆盖盲区",
+            "#### 当前覆盖边界与盲区",
             "",
             "- **无族级映射的 `model_family`**："
             + _code_list(list(matrix.family_gaps))
-            + "。这两类模型在族—任务映射中只剩任务级约束；若包含公式，仍会叠加上述公式级检查。",
+            + "。这些取值必须声明非空 `validation_facets`，审计器按所选模型族的检查取并集；因此它们不再构成有效输入的族级覆盖盲区。",
+            "- **无族级映射的 `validation_facets`**："
+            + _code_list(list(matrix.facet_gaps))
+            + "。合法 facet 与族级映射键保持一致；该差集非空时生成器会拒绝输出。",
             "- **无任务级映射的 `task_type`**："
             + _code_list(list(matrix.task_gaps))
             + "。该任务类型不受任务级 check 覆盖约束，仍可能受模型族与公式级约束。",

@@ -64,6 +64,8 @@
 
 下表是审计器的强制口径；Agent 应在 G2 之前依据已经确定的 `model_family` 与 `task_type` 填写 `validation_plan.checks`，不适用的检查也要显式标为 `not_applicable` 并写明理由，不要等审计出现 `BLOCK` 后再补。
 
+`validation_facets` 用于声明一个模型实际跨越的验证维度，取值只能来自下表七个有族级映射的模型族。`model_family` 为 `hybrid` 或 `other` 时必须至少填写一项，审计器对所有 facet 的必需检查取并集；其余模型族可省略该字段，省略时等价于只选择自身模型族。
+
 <!-- BEGIN GENERATED: validation-matrix -->
 ### 审计器验证覆盖决策表
 
@@ -80,8 +82,8 @@
 | `simulation` | `convergence`、`conservation_balance`、`numerical_stability`、`boundary_case` |
 | `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
 | `causal` | `uncertainty`、`identifiability`、`falsification` |
-| `hybrid` | —（无族级强制检查；仍可能受任务级与公式级约束） |
-| `other` | —（无族级强制检查；仍可能受任务级与公式级约束） |
+| `hybrid` | 由必填的 `validation_facets` 所选模型族检查取并集（仍叠加任务级与公式级约束） |
+| `other` | 由必填的 `validation_facets` 所选模型族检查取并集（仍叠加任务级与公式级约束） |
 
 #### 任务类型 → 必须考虑的 checks
 
@@ -97,9 +99,10 @@
 
 当 `formulation.equations`、`objectives` 或 `constraints` 中任一列表非空时，审计器还会叠加公式级检查：`dimensional_consistency`、`domain_validity`、`formula_back_substitution`。
 
-#### 当前覆盖盲区
+#### 当前覆盖边界与盲区
 
-- **无族级映射的 `model_family`**：`hybrid`、`other`。这两类模型在族—任务映射中只剩任务级约束；若包含公式，仍会叠加上述公式级检查。
+- **无族级映射的 `model_family`**：`hybrid`、`other`。这些取值必须声明非空 `validation_facets`，审计器按所选模型族的检查取并集；因此它们不再构成有效输入的族级覆盖盲区。
+- **无族级映射的 `validation_facets`**：（无）。合法 facet 与族级映射键保持一致；该差集非空时生成器会拒绝输出。
 - **无任务级映射的 `task_type`**：`other`。该任务类型不受任务级 check 覆盖约束，仍可能受模型族与公式级约束。
 - **未被族、任务或公式规则自动要求的 `validationCheckType`**：`seed_stability`、`reproducibility`、`other`。其中 `seed_stability` 对随机算法是关键检查，目前完全依赖人工在 `validation_plan.checks` 中主动声明；`reproducibility` 与 `other` 同样不会被自动补入。
 <!-- END GENERATED: validation-matrix -->

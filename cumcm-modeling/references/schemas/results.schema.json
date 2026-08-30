@@ -129,6 +129,8 @@
               {"type": "null"}
             ]
           },
+          "objective_incumbent": {"$ref": "common.schema.json#/$defs/measurement"},
+          "objective_bound": {"$ref": "common.schema.json#/$defs/measurement"},
           "source_file": {
             "oneOf": [
               {"$ref": "common.schema.json#/$defs/fileRef"},
@@ -187,6 +189,10 @@
               "required": ["baseline_model_ref", "baseline_result_ref", "primary_metric_ref", "baseline_metric_ref", "comparison_rule_ref", "observed_delta", "status"]
             }
           }
+        },
+        "dependentRequired": {
+          "objective_incumbent": ["objective_bound"],
+          "objective_bound": ["objective_incumbent"]
         },
         "allOf": [
           {

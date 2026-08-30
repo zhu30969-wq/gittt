@@ -1,4 +1,4 @@
-schema_version: 2.0.1
+schema_version: 2.1.0
 kind: experiment
 id: experiment:main
 revision: 1
@@ -10,6 +10,7 @@ extensions: {}
 model_ref: model:main
 question_refs: [question:q1]
 mode: exploratory
+decision_timing: here_and_now
 purpose: "替换为本实验要回答的问题。"
 hypothesis: null
 data_refs: []

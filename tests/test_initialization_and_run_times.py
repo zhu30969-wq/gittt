@@ -33,9 +33,13 @@ from test_audit_regressions import (  # noqa: E402
 CREATED_ROOTS: list[Path] = []
 
 # Compatibility exemption: this literal deliberately remains at 2.0.0 after
-# current generators move to 2.0.1.  It proves that a valid 2.0.x predecessor
+# current generators move to 2.1.0.  It proves that a valid 2.0.x predecessor
 # remains readable and is never rewritten by a no-op initialization.
 LEGACY_2_0_COMPAT_VERSION = "2.0.0"
+
+# Compatibility fixture for the last 2.0.x contract generated before
+# decision_timing became mandatory in 2.1.0.
+LEGACY_2_0_1_COMPAT_VERSION = "2.0.1"
 
 
 def new_target(prefix: str) -> Path:
@@ -142,6 +146,7 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         self.assertEqual(2034, problem["contest"]["year"])
         self.assertEqual("C", problem["contest"]["problem_code"])
         self.assertEqual([8675309], experiment["seeds"])
+        self.assertEqual("here_and_now", experiment["decision_timing"])
         self.assertEqual([8675309], result["run"]["seeds"])
         self.assertIsNone(result["run"]["started_at"])
         self.assertIsNone(result["run"]["finished_at"])
@@ -728,6 +733,98 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         self.assertNotIn("SCHEMA_VERSION_UNSUPPORTED", finding_codes(audit_report))
         self.assertNotIn("FILE_HASH_MISMATCH", finding_codes(audit_report))
         self.assertNotIn("ARTIFACT_HASH_MISMATCH", finding_codes(audit_report))
+
+    def test_legacy_2_0_1_without_decision_timing_is_noop_and_auditable(self) -> None:
+        """C5: pre-2.1 experiment omission is a semantic finding, not a parse failure."""
+
+        target = new_target("cumcm-init-legacy-2-0-1-")
+        first_code, first_report = run_initializer(
+            target,
+            "--project-id",
+            "project:legacy-2-0-1",
+            "--contest-year",
+            "2038",
+        )
+        self.assertEqual(0, first_code, first_report)
+
+        def downgrade_contract(document: dict) -> None:
+            document["schema_version"] = LEGACY_2_0_1_COMPAT_VERSION
+            if document.get("kind") == "experiment":
+                document.pop("decision_timing", None)
+
+        manifest = load_yaml(target / "manifest.yaml")
+        for artifact in manifest["artifacts"]:
+            mutate_yaml(target, artifact["path"], downgrade_contract)
+        mutate_yaml(
+            target,
+            "manifest.yaml",
+            lambda document: document.update(
+                schema_version=LEGACY_2_0_1_COMPAT_VERSION
+            ),
+        )
+        before = snapshot_tree(target)
+
+        code, report = run_initializer(target)
+
+        self.assertEqual(0, code, report)
+        self.assertEqual("PASS", report.get("status"), report)
+        self.assertNotIn("code", report)
+        self.assertTrue(target.is_dir())
+        self.assertEqual(before, snapshot_tree(target))
+        self.assertTrue(
+            all(item["status"] == "NOT_APPLICABLE" for item in report["findings"]),
+            report,
+        )
+
+        audit_code, audit_report = run_auditor(target)
+        codes = finding_codes(audit_report)
+        timing_findings = [
+            finding
+            for gate in audit_report["gates"]
+            for finding in gate["findings"]
+            if finding["code"] == "DECISION_TIMING_REQUIRED"
+        ]
+        self.assertEqual(10, audit_code, audit_report)
+        self.assertEqual("BLOCK", audit_report.get("status"), audit_report)
+        self.assertEqual(before, snapshot_tree(target))
+        self.assertEqual(1, len(timing_findings), timing_findings)
+        self.assertEqual("G3", timing_findings[0]["gate"])
+        self.assertEqual("experiment:main", timing_findings[0].get("artifact_id"))
+        self.assertNotIn("SCHEMA_INVALID", codes)
+        self.assertNotIn("SCHEMA_VERSION_UNSUPPORTED", codes)
+        self.assertNotIn("AUDIT_INTERNAL_ERROR", codes)
+        self.assertNotIn("FILE_HASH_MISMATCH", codes)
+        self.assertNotIn("ARTIFACT_HASH_MISMATCH", codes)
+
+    def test_current_2_1_0_experiment_still_requires_decision_timing_in_schema(self) -> None:
+        """The legacy exception must not weaken newly generated 2.1 contracts."""
+
+        target = new_target("cumcm-init-current-decision-timing-")
+        first_code, first_report = run_initializer(
+            target,
+            "--project-id",
+            "project:current-decision-timing",
+            "--contest-year",
+            "2038",
+        )
+        self.assertEqual(0, first_code, first_report)
+        experiment = load_yaml(target / "experiments" / "experiment.yaml")
+        self.assertEqual("2.1.0", experiment["schema_version"])
+
+        mutate_yaml(
+            target,
+            "experiments/experiment.yaml",
+            lambda document: document.pop("decision_timing"),
+        )
+        before = snapshot_tree(target)
+
+        audit_code, audit_report = run_auditor(target)
+
+        self.assertEqual(10, audit_code, audit_report)
+        self.assertEqual("BLOCK", audit_report.get("status"), audit_report)
+        self.assertEqual(before, snapshot_tree(target))
+        self.assertIn("SCHEMA_INVALID", finding_codes(audit_report))
+        self.assertNotIn("AUDIT_INTERNAL_ERROR", finding_codes(audit_report))
 
     def test_partial_placeholder_allows_null_timestamps(self) -> None:
         target = new_target("cumcm-init-null-time-")

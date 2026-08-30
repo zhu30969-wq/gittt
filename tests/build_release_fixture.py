@@ -254,6 +254,7 @@ def main() -> int:
     experiment = load_yaml(target / "experiments/experiment.yaml")
     experiment["lifecycle_status"] = "frozen"
     experiment["mode"] = "confirmatory"
+    experiment["decision_timing"] = "here_and_now"
     experiment["purpose"] = "Confirm the deterministic fixture output and evidence links."
     experiment["hypothesis"] = "The generated score equals 1.25."
     experiment["data_refs"] = ["data:synthetic"]
@@ -379,7 +380,7 @@ def main() -> int:
     save_yaml(target, "figures/figures.yaml", figures)
 
     paper_build = {
-        "schema_version": "2.0.1",
+        "schema_version": "2.1.0",
         "kind": "paper_build",
         "id": "build:paper",
         "revision": 1,

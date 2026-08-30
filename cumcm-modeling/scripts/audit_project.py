@@ -84,6 +84,7 @@ GATES = tuple(f"G{number}" for number in range(8))
 ZERO_HASH = "0" * 64
 HARD_STATUSES = {"BLOCK", "ENV_BLOCK", "STALE"}
 TEAM_ROLES = {"modeling", "computation", "writing"}
+DECISION_TIMING_VALUES = {"here_and_now", "wait_and_see", "recourse"}
 RELEASE_GATE_REQUIRED_ROLES: dict[str, set[str]] = {
     "G0": set(),
     "G1": set(TEAM_ROLES),
@@ -181,6 +182,25 @@ NUMERIC_OPERATIONS = {
 }
 
 
+def effective_validation_facets(model: dict[str, Any]) -> set[str]:
+    """Return additive family facets without allowing a mapped family to be dropped."""
+
+    declared = model.get("validation_facets", [])
+    facets = (
+        {
+            facet
+            for facet in declared
+            if isinstance(facet, str) and facet in VALIDATION_COVERAGE_BY_FAMILY
+        }
+        if isinstance(declared, list)
+        else set()
+    )
+    model_family = model.get("model_family")
+    if model_family in VALIDATION_COVERAGE_BY_FAMILY:
+        facets.add(str(model_family))
+    return facets
+
+
 def metric_signature(metric: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
     """Return the declared comparison semantics of one experiment metric."""
 
@@ -220,6 +240,8 @@ def experiments_are_comparable(primary: dict[str, Any], baseline: dict[str, Any]
         set(primary.get("question_refs", [])) == set(baseline.get("question_refs", []))
         and set(primary.get("data_refs", [])) == set(baseline.get("data_refs", []))
         and primary.get("split_strategy") == baseline.get("split_strategy")
+        and primary.get("decision_timing") in DECISION_TIMING_VALUES
+        and primary.get("decision_timing") == baseline.get("decision_timing")
         and primary.get("seeds") == baseline.get("seeds")
         and primary.get("repetitions") == baseline.get("repetitions")
         and primary.get("timeout_seconds") == baseline.get("timeout_seconds")
@@ -1039,6 +1061,32 @@ class Audit:
                 "BLOCK",
                 "SCHEMA_INVALID",
                 f"{location}: {error.message}",
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        validation_facets = document.get("validation_facets")
+        if kind == "model_spec" and document.get("model_family") in {"hybrid", "other"} and (
+            "validation_facets" not in document
+            or isinstance(validation_facets, list) and not validation_facets
+        ):
+            self.add(
+                "G2",
+                "BLOCK",
+                "VALIDATION_FACETS_REQUIRED",
+                f"{document.get('id')} model_family={document.get('model_family')!r} requires at least one validation facet",
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        if kind == "experiment" and "decision_timing" not in document:
+            self.add(
+                "G3",
+                "BLOCK",
+                "DECISION_TIMING_REQUIRED",
+                (
+                    f"{document.get('id')} schema_version={document.get('schema_version')!r} omits "
+                    "decision_timing; explicitly declare here_and_now, wait_and_see, or recourse; "
+                    "the auditor does not infer a default"
+                ),
                 path=relative,
                 artifact_id=document.get("id"),
             )
@@ -2336,7 +2384,10 @@ class Audit:
 
             checks = model.get("validation_plan", {}).get("checks", [])
             declared_check_types = {check.get("check_type") for check in checks}
-            required_check_types = set(VALIDATION_COVERAGE_BY_FAMILY.get(model.get("model_family"), set()))
+            validation_facets = effective_validation_facets(model)
+            required_check_types: set[str] = set()
+            for validation_facet in validation_facets:
+                required_check_types.update(VALIDATION_COVERAGE_BY_FAMILY[validation_facet])
             for question_ref in model_addresses:
                 required_check_types.update(
                     VALIDATION_COVERAGE_BY_TASK.get(questions_by_id.get(str(question_ref), {}).get("task_type"), set())
@@ -2400,6 +2451,21 @@ class Audit:
                         f"{model_id}/{rule.get('trigger_check_ref')} cannot trigger fallback because it is not a blocking failure",
                         artifact_id=model_id,
                     )
+            if "optimization" in validation_facets and not any(
+                check.get("check_type") == "solver_optimality"
+                and check.get("applicability") == "required"
+                and check.get("criticality") == "blocking"
+                and isinstance(check.get("threshold"), dict)
+                and is_finite_number(check.get("threshold", {}).get("value"))
+                for check in checks
+            ):
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "SOLVER_OPTIMALITY_NOT_BLOCKING",
+                    f"{model_id} has optimization validation scope but no required blocking solver_optimality check with a numeric threshold",
+                    artifact_id=model_id,
+                )
             selected_baselines = set(model.get("method_selection", {}).get("baseline_policy", {}).get("model_refs", []))
             if selected_baselines and not any(
                 check.get("check_type") == "baseline_comparison"
@@ -4457,6 +4523,43 @@ class Audit:
     def validate_claims(self, claims_docs: list[dict[str, Any]], results: list[dict[str, Any]]) -> None:
         release_mode = self.release_mode()
         result_by_id = {result.get("id"): result for result in results}
+        experiment_by_id = {
+            document.get("id"): document
+            for artifact_id, document in self.documents.items()
+            if self.artifact_is_release_active(artifact_id)
+            and document.get("kind") == "experiment"
+        }
+
+        def solver_objective_interval(result: dict[str, Any]) -> tuple[Decimal, Decimal, str] | None:
+            intervals: list[tuple[Decimal, Decimal, str]] = []
+            for diagnostic in result.get("diagnostics", []):
+                if diagnostic.get("check_type") != "solver_optimality":
+                    continue
+                incumbent = diagnostic.get("objective_incumbent")
+                bound = diagnostic.get("objective_bound")
+                if not isinstance(incumbent, dict) or not isinstance(bound, dict):
+                    continue
+                incumbent_value = incumbent.get("value")
+                bound_value = bound.get("value")
+                unit = incumbent.get("unit")
+                if (
+                    not is_finite_number(incumbent_value)
+                    or not is_finite_number(bound_value)
+                    or not isinstance(unit, str)
+                    or bound.get("unit") != unit
+                ):
+                    continue
+                incumbent_decimal = decimal_number(incumbent_value)
+                bound_decimal = decimal_number(bound_value)
+                intervals.append(
+                    (
+                        min(incumbent_decimal, bound_decimal),
+                        max(incumbent_decimal, bound_decimal),
+                        unit,
+                    )
+                )
+            return intervals[0] if len(intervals) == 1 else None
+
         valid_assumption_ids = {
             assumption.get("id")
             for artifact_id, problem in self.documents.items()
@@ -4528,6 +4631,67 @@ class Audit:
                     for item in claim.get("evidence_refs", [])
                     if self.id_definitions.get(item.get("ref"), (None, None, None))[2] == "results"
                 ]
+                if claim.get("claim_type") == "comparative":
+                    comparison_result_ids = {
+                        result_id
+                        for result_id in evidence_result_ids
+                        if isinstance(result_id, str) and result_id in result_by_id
+                    }
+                    for result_id in tuple(comparison_result_ids):
+                        for diagnostic in result_by_id[result_id].get("diagnostics", []):
+                            if diagnostic.get("check_type") != "baseline_comparison":
+                                continue
+                            comparison_result_ids.update(
+                                baseline_result_ref
+                                for binding in diagnostic.get("comparison_bindings", [])
+                                if isinstance(binding, dict)
+                                for baseline_result_ref in [binding.get("baseline_result_ref")]
+                                if isinstance(baseline_result_ref, str) and baseline_result_ref in result_by_id
+                            )
+
+                    if len(comparison_result_ids) >= 2:
+                        timing_by_result: dict[str, str] = {}
+                        interval_by_result: dict[str, tuple[Decimal, Decimal, str]] = {}
+                        for result_id in sorted(comparison_result_ids):
+                            comparison_result = result_by_id[result_id]
+                            experiment = experiment_by_id.get(comparison_result.get("experiment_ref"))
+                            if isinstance(experiment, dict) and isinstance(experiment.get("decision_timing"), str):
+                                timing_by_result[result_id] = experiment["decision_timing"]
+                            objective_interval = solver_objective_interval(comparison_result)
+                            if objective_interval is not None:
+                                interval_by_result[result_id] = objective_interval
+
+                        if len(set(timing_by_result.values())) > 1:
+                            timing_summary = ", ".join(
+                                f"{result_id}={timing_by_result[result_id]}"
+                                for result_id in sorted(timing_by_result)
+                            )
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "DECISION_TIMING_MISMATCH",
+                                f"{claim.get('id')} compares results produced under different decision timing: {timing_summary}",
+                                artifact_id=registry.get("id"),
+                            )
+
+                        overlapping_pairs: list[tuple[str, str]] = []
+                        interval_result_ids = sorted(interval_by_result)
+                        for left_index, left_result_id in enumerate(interval_result_ids):
+                            left_lower, left_upper, left_unit = interval_by_result[left_result_id]
+                            for right_result_id in interval_result_ids[left_index + 1:]:
+                                right_lower, right_upper, right_unit = interval_by_result[right_result_id]
+                                if left_unit != right_unit:
+                                    continue
+                                if max(left_lower, right_lower) <= min(left_upper, right_upper):
+                                    overlapping_pairs.append((left_result_id, right_result_id))
+                        if overlapping_pairs:
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "RANKING_WITHIN_SOLVER_GAP",
+                                f"{claim.get('id')} ranks or compares results whose solver objective intervals overlap: {overlapping_pairs}",
+                                artifact_id=registry.get("id"),
+                            )
                 for assertion in claim.get("numeric_assertions", []):
                     metric_ref = assertion.get("metric_ref")
                     source_token = assertion.get("source_token", "")
