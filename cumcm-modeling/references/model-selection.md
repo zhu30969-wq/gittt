@@ -78,7 +78,7 @@
 | `descriptive` | `input_integrity` |
 | `statistical` | `uncertainty`、`residual_diagnostics` |
 | `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
-| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`sensitivity` |
+| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`objective_reconciliation`、`sensitivity` |
 | `simulation` | `convergence`、`conservation_balance`、`numerical_stability`、`boundary_case` |
 | `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
 | `causal` | `uncertainty`、`identifiability`、`falsification` |
@@ -132,6 +132,8 @@
 - 求解规模和剩余时间是否允许精确算法。
 
 启发式算法不是“非线性”的默认答案。使用启发式时必须报告可行性、基线差距、重复运行波动，且不得无证据宣称全局最优。
+
+除求解器 gap/上下界外，还要做独立的目标对账：固定最终主决策，用单独脚本重新优化辅助变量并比较目标值。对同一组辅助变量简单重新求和不属于 `objective_reconciliation`，因为它无法发现“可行但辅助响应未达最优”的实现遗漏。
 
 ### 评价与排序
 

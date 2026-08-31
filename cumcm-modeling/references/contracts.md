@@ -77,7 +77,7 @@ question → model → experiment → result → claim → figure/table/paper
 | descriptive | 输入完整性 |
 | statistical | 残差诊断、不确定性 |
 | prediction | 基线、泄漏、预测误差、不确定性 |
-| optimization | 约束可行性、求解状态/最优性、基线、敏感性 |
+| optimization | 约束可行性、求解状态/最优性、固定主决策后的目标对账、基线、敏感性 |
 | simulation | 边界情形、收敛、守恒/平衡、数值稳定性 |
 | evaluation | 基线、敏感性、排名稳定性 |
 | causal | 可识别性、反证检查、不确定性 |
@@ -85,6 +85,8 @@ question → model → experiment → result → claim → figure/table/paper
 `hybrid` 和 `other` 不能由单一标签决定检查面，必须用非空 `validation_facets` 选择上述一个或多个模型族；审计器对所选 facet 的必需检查取并集。其他模型族省略该字段时等价于只选择自身模型族。G2 人工 review 仍须核对这些结构化检查是否覆盖真实失败方式。
 
 优化模型的启发式结果默认只能支持“当前找到的最好解”。若要使用“全局最优”，必须提供严格证明、可核验证书或有效的上下界，并经过人工复核。
+
+`objective_reconciliation` 与 `solver_optimality` 正交：前者固定已经输出的主决策变量，再用独立代码重新优化其余辅助变量，检查当前实现是否遗漏了可改善的最优响应；后者只描述求解器对其所接收模型的求解质量。对账 diagnostic 必须声明非空且不相交的主决策/辅助变量标识，绑定实验中独立于主入口的代码文件及 SHA-256，记录求解方法、目标 metric、原目标、最优响应目标、方向化 `repair_gain` 和预登记容差。审计器只能强制这些结构并重算差值，不能证明独立脚本确实实现了正确的重新优化。
 
 ### `model_promotion`
 
@@ -113,6 +115,8 @@ question → model → experiment → result → claim → figure/table/paper
 成功结果必须记录实际完成的重复次数，并为每项 `required` 或 `conditional` validation check 提供唯一的结构化 diagnostic。diagnostic 绑定 `check_ref`，保存类型、状态、严重度、过程、观察、结论和证据文件；若计划预先声明了数值阈值，审计器用实际观测值、单位和运算符重新计算 PASS/BLOCK，不能接受手填状态。缺失 required diagnostic、阻断性诊断未通过、重复次数不足或 bundled 输入没有进入运行输入清单时，该结果不能支持 final claim。
 
 求解器诊断可成对填写 `objective_incumbent` 与 `objective_bound`，两者都是带单位的 measurement，任一出现时另一项也必须出现。incumbent 表示当前可行候选的目标值，bound 表示对全局最优值有效的界；最小化问题的质量区间为 `[bound, incumbent]`，最大化问题为 `[incumbent, bound]`。候选区间重叠时不能据此声称严格排名或优于关系。
+
+目标对账诊断使用 `objective_reconciliation` 对象。`objective_metric_ref` 确定目标方向和单位；最大化的 `repair_gain = best_response_objective - solver_objective`，最小化则反向相减，正值表示固定主决策后仍存在可修复改善。审计器还要求 `solver_objective` 等于该 result 已登记的 metric，并按 `max(absolute_tolerance, relative_tolerance × max(|solver_objective|, |best_response_objective|))`（只使用实际提供的容差项）判断差值幅度。`registration_timing: post_result` 沿用接受规则的证据限制：探索性运行只给出事后提示，确认性或验证性运行不能据此形成 eligible 证据。
 
 当主方法声明基线时，基线必须有可比且 eligible 的结果。主结果还必须在 `depends_on` 和完整指纹闭包中绑定实际采用的 baseline result；否则基线结果变化不会传播失效，主结果也不得进入结论。
 

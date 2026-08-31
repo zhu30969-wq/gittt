@@ -281,6 +281,7 @@
         "residual_diagnostics",
         "constraint_feasibility",
         "solver_optimality",
+        "objective_reconciliation",
         "convergence",
         "conservation_balance",
         "numerical_stability",

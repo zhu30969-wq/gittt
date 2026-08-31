@@ -33,7 +33,7 @@ from test_audit_regressions import (  # noqa: E402
 CREATED_ROOTS: list[Path] = []
 
 # Compatibility exemption: this literal deliberately remains at 2.0.0 after
-# current generators move to 2.1.0.  It proves that a valid 2.0.x predecessor
+# current generators move to 2.2.0.  It proves that a valid 2.0.x predecessor
 # remains readable and is never rewritten by a no-op initialization.
 LEGACY_2_0_COMPAT_VERSION = "2.0.0"
 
@@ -796,8 +796,8 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         self.assertNotIn("FILE_HASH_MISMATCH", codes)
         self.assertNotIn("ARTIFACT_HASH_MISMATCH", codes)
 
-    def test_current_2_1_0_experiment_still_requires_decision_timing_in_schema(self) -> None:
-        """The legacy exception must not weaken newly generated 2.1 contracts."""
+    def test_current_2_2_0_experiment_still_requires_decision_timing_in_schema(self) -> None:
+        """The legacy exception must not weaken newly generated 2.2 contracts."""
 
         target = new_target("cumcm-init-current-decision-timing-")
         first_code, first_report = run_initializer(
@@ -809,7 +809,7 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         )
         self.assertEqual(0, first_code, first_report)
         experiment = load_yaml(target / "experiments" / "experiment.yaml")
-        self.assertEqual("2.1.0", experiment["schema_version"])
+        self.assertEqual("2.2.0", experiment["schema_version"])
 
         mutate_yaml(
             target,

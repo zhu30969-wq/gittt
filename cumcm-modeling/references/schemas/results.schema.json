@@ -131,6 +131,31 @@
           },
           "objective_incumbent": {"$ref": "common.schema.json#/$defs/measurement"},
           "objective_bound": {"$ref": "common.schema.json#/$defs/measurement"},
+          "objective_reconciliation": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "objective_metric_ref": {"$ref": "common.schema.json#/$defs/typedId"},
+              "fixed_primary_decisions": {
+                "type": "array",
+                "items": {"$ref": "common.schema.json#/$defs/typedId"},
+                "uniqueItems": true
+              },
+              "reoptimized_auxiliary_variables": {
+                "type": "array",
+                "items": {"$ref": "common.schema.json#/$defs/typedId"},
+                "uniqueItems": true
+              },
+              "solver_objective": {"$ref": "common.schema.json#/$defs/measurement"},
+              "best_response_objective": {"$ref": "common.schema.json#/$defs/measurement"},
+              "repair_gain": {"$ref": "common.schema.json#/$defs/measurement"},
+              "absolute_tolerance": {"type": ["number", "null"], "minimum": 0},
+              "relative_tolerance": {"type": ["number", "null"], "minimum": 0},
+              "registration_timing": {"type": "string", "enum": ["pre_result", "post_result"]},
+              "reconciliation_code_file": {"$ref": "common.schema.json#/$defs/fileRef"},
+              "reconciliation_method": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+            }
+          },
           "source_file": {
             "oneOf": [
               {"$ref": "common.schema.json#/$defs/fileRef"},

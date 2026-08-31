@@ -1,4 +1,4 @@
-schema_version: "2.1.0"
+schema_version: "2.2.0"
 purpose: "Behavioral forward tests for the cumcm-modeling skill"
 scenarios:
   - id: "E01-complete-chain"

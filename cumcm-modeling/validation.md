@@ -17,7 +17,7 @@ python scripts/init_project.py ./work \
   --default-seed 42 --paper-engine latex
 ```
 
-新项目必须显式提供 `--contest-year`，初始化器不会从当前日期或项目 ID 猜测年份。`--problem-code`、`--default-seed` 和 `--paper-engine` 分别默认使用 `UNSET`、`42` 和 `latex`，并记录在 `manifest.extensions.initialization`；种子不再与年份绑定。初始化器只创建缺失文件。完整目标无参数重复调用时，顶层 `status` 返回 `PASS`、退出码为 `0`，每个已存在文件的 finding 为 `NOT_APPLICABLE`，且不会覆盖、合并或刷新任何已有文件。初始化相关的五类拒绝都发生在写入之前且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数没有现有记录且没有缺失模板会真实消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源不一致时返回 `EXISTING_INITIALIZATION_INVALID`。旧项目若缺少模板文件且没有保存所需初始化值，应显式补充参数；只有真实包含相应占位符的缺失文件才会消费该参数。当前模板生成 `2.1.0` 契约；合法 `2.x.x`（包括 `2.0.0` 与 `2.0.1`）仍可读取、重复初始化和审计，no-op 不自动迁移或改写旧版本，`1.x` 仍不受支持。旧 `2.0.1` experiment 缺少 `decision_timing` 时不会在 Schema 层中断读取，而由审计器返回明确的 `DECISION_TIMING_REQUIRED` finding；用户必须按真实决策时序显式补值，工具不会猜测或自动写回。
+新项目必须显式提供 `--contest-year`，初始化器不会从当前日期或项目 ID 猜测年份。`--problem-code`、`--default-seed` 和 `--paper-engine` 分别默认使用 `UNSET`、`42` 和 `latex`，并记录在 `manifest.extensions.initialization`；种子不再与年份绑定。初始化器只创建缺失文件。完整目标无参数重复调用时，顶层 `status` 返回 `PASS`、退出码为 `0`，每个已存在文件的 finding 为 `NOT_APPLICABLE`，且不会覆盖、合并或刷新任何已有文件。初始化相关的五类拒绝都发生在写入之前且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数没有现有记录且没有缺失模板会真实消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源不一致时返回 `EXISTING_INITIALIZATION_INVALID`。旧项目若缺少模板文件且没有保存所需初始化值，应显式补充参数；只有真实包含相应占位符的缺失文件才会消费该参数。当前模板生成 `2.2.0` 契约；合法 `2.x.x`（包括 `2.0.0`、`2.0.1` 与 `2.1.0`）仍可读取、重复初始化和审计，no-op 不自动迁移或改写旧版本，`1.x` 仍不受支持。旧 `2.0.1` experiment 缺少 `decision_timing` 时不会在 Schema 层中断读取，而由审计器返回明确的 `DECISION_TIMING_REQUIRED` finding；`2.2.0` 新增 optimization 的 `objective_reconciliation` 强制考虑项，旧 `2.1.x` 优化项目缺失它时仍可读取，并由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding。两类字段都必须依据真实语义显式补齐，工具不会猜测或自动写回。
 
 模板中的题面、代码、环境和结果是明确占位内容。未执行的普通 partial 结果可用 `started_at: null` 与 `finished_at: null`，不伪造运行时间；success、failed 和实际 promotion-trigger partial 必须记录真实且有序的时间区间。填写并重新锁定 manifest 前，审计出现 `BLOCK` 或 `STALE` 是预期行为。
 
@@ -126,7 +126,11 @@ BLOCK > ENV_BLOCK > STALE > WARN > PASS > NOT_APPLICABLE
 以下检查直接阻断不完整或不可比的验证证据：
 
 - `VALIDATION_FACETS_REQUIRED`：`model_family` 为 `hybrid` 或 `other`，但没有声明至少一项合法 `validation_facets`。
+- `OBJECTIVE_RECONCILIATION_REQUIRED`：`2.2.0` 以前的 optimization 契约没有登记新引入的固定主决策—辅助变量最优响应检查；旧文件仍可读取，但补齐前保持 G2 `BLOCK`。
 - `SOLVER_OPTIMALITY_NOT_BLOCKING`：模型的有效验证 facet 包含 `optimization`，但没有 `applicability: required`、`criticality: blocking` 且带数值 `threshold` 的 `solver_optimality` 检查。
+- `OBJECTIVE_RECONCILIATION_INCOMPLETE` / `OBJECTIVE_RECONCILIATION_SCOPE_INVALID` / `OBJECTIVE_RECONCILIATION_NOT_INDEPENDENT`：最优响应对账缺字段、主/辅助变量集合为空或相交、变量不属于模型，或重用了实验主入口。
+- `OBJECTIVE_RECONCILIATION_MISMATCH`：登记的求解器目标没有绑定结果 metric，或 `repair_gain` 不等于审计器按目标方向重算的差值。
+- `OBJECTIVE_REPAIR_GAIN_EXCEEDED`：固定主决策后重新优化辅助变量所得目标变化超过预登记的绝对/相对容差，相关 result 不能成为 eligible 证据。
 - `RANKING_WITHIN_SOLVER_GAP`：claim 声称候选存在排名或优于关系，但相应 result 记录的 `objective_incumbent`—`objective_bound` 求解质量区间重叠。
 - `DECISION_TIMING_REQUIRED`：experiment 缺少显式 `decision_timing`；旧 `2.0.x` 契约仍会进入完整审计，但不得由工具猜测默认值，补齐真实时序前保持 G3 `BLOCK`。
 - `DECISION_TIMING_MISMATCH`：跨 result 的差值、排名或优于基线判断引用了 `decision_timing` 不一致的 experiment。

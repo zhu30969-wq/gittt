@@ -113,7 +113,13 @@ VALIDATION_COVERAGE_BY_FAMILY: dict[str, set[str]] = {
     "descriptive": {"input_integrity"},
     "statistical": {"residual_diagnostics", "uncertainty"},
     "prediction": {"baseline_comparison", "holdout_leakage", "predictive_error", "uncertainty"},
-    "optimization": {"constraint_feasibility", "solver_optimality", "baseline_comparison", "sensitivity"},
+    "optimization": {
+        "constraint_feasibility",
+        "solver_optimality",
+        "objective_reconciliation",
+        "baseline_comparison",
+        "sensitivity",
+    },
     "simulation": {"boundary_case", "convergence", "conservation_balance", "numerical_stability"},
     "evaluation": {"baseline_comparison", "sensitivity", "rank_stability"},
     "causal": {"identifiability", "falsification", "uncertainty"},
@@ -127,6 +133,7 @@ VALIDATION_COVERAGE_BY_TASK: dict[str, set[str]] = {
     "decision": {"baseline_comparison", "sensitivity"},
 }
 FORMULA_VALIDATION_CHECKS = {"dimensional_consistency", "domain_validity", "formula_back_substitution"}
+OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION = (2, 2, 0)
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 PAPER_COMPILERS_BY_ENGINE = {
     "latex": {"latexmk", "xelatex", "lualatex", "pdflatex", "tectonic"},
@@ -224,6 +231,17 @@ def decimal_number(value: Any) -> Decimal:
     if not converted.is_finite():
         raise ValueError(f"non-finite numeric value: {value!r}")
     return converted
+
+
+def contract_version_tuple(document: dict[str, Any]) -> tuple[int, int, int]:
+    """Return a schema-validated 2.x contract version for compatibility gates."""
+
+    match = re.fullmatch(
+        r"(\d+)\.(\d+)\.(\d+)", str(document.get("schema_version", ""))
+    )
+    if match is None:
+        return (0, 0, 0)
+    return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
 def experiments_are_comparable(primary: dict[str, Any], baseline: dict[str, Any]) -> bool:
@@ -2395,6 +2413,27 @@ class Audit:
             if any(model.get("formulation", {}).get(section, []) for section in ("equations", "objectives", "constraints")):
                 required_check_types.update(FORMULA_VALIDATION_CHECKS)
             missing_check_types = required_check_types.difference(declared_check_types)
+            if (
+                "objective_reconciliation" in missing_check_types
+                and "optimization" in validation_facets
+                and contract_version_tuple(model) < OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION
+            ):
+                # Contracts before 2.2.0 remain schema-readable.  Surface the
+                # newly required optimization check as a precise semantic
+                # migration finding instead of hiding it in the generic
+                # coverage message or rejecting the old document at parse time.
+                missing_check_types.remove("objective_reconciliation")
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "OBJECTIVE_RECONCILIATION_REQUIRED",
+                    (
+                        f"{model_id} schema_version={model.get('schema_version')!r} has optimization "
+                        "validation scope but predates the objective_reconciliation requirement; "
+                        "declare the check and its fixed-decision best-response procedure"
+                    ),
+                    artifact_id=model_id,
+                )
             if missing_check_types:
                 self.add(
                     "G2",
@@ -3437,6 +3476,21 @@ class Audit:
                             )
                             eligible = False
 
+                if (
+                    execution_complete
+                    and diagnostic.get("check_type") == "objective_reconciliation"
+                    and status != "NOT_APPLICABLE"
+                    and not self.validate_objective_reconciliation(
+                        result=result,
+                        experiment=experiment,
+                        model=model or {},
+                        diagnostic=diagnostic,
+                        metric_rows=metric_rows,
+                        metric_specs=metric_specs,
+                    )
+                ):
+                    eligible = False
+
                 threshold = check.get("threshold")
                 observed_measurement = diagnostic.get("observed")
                 if (
@@ -4421,6 +4475,267 @@ class Audit:
                     f"{result_id} depends on uncertified fallback promotion event(s) {sorted(bound_candidates)}",
                     artifact_id=result_id,
                 )
+
+    def validate_objective_reconciliation(
+        self,
+        *,
+        result: dict[str, Any],
+        experiment: dict[str, Any],
+        model: dict[str, Any],
+        diagnostic: dict[str, Any],
+        metric_rows: dict[str, list[dict[str, Any]]],
+        metric_specs: dict[str, dict[str, Any]],
+    ) -> bool:
+        """Recompute fixed-decision best-response gain from structured evidence.
+
+        The auditor cannot prove that the independent script actually solves
+        the claimed auxiliary optimization.  It can, however, make a same-
+        assignment re-sum structurally visible by requiring disjoint variable
+        scopes, a separately hashed code file and an explicit solver/method.
+        """
+
+        result_id = result.get("id")
+        check_ref = diagnostic.get("check_ref")
+        reconciliation = diagnostic.get("objective_reconciliation")
+        required_fields = {
+            "objective_metric_ref",
+            "fixed_primary_decisions",
+            "reoptimized_auxiliary_variables",
+            "solver_objective",
+            "best_response_objective",
+            "repair_gain",
+            "registration_timing",
+            "reconciliation_code_file",
+            "reconciliation_method",
+        }
+        if not isinstance(reconciliation, dict):
+            missing_fields = sorted(required_fields)
+        else:
+            missing_fields = sorted(required_fields.difference(reconciliation))
+        absolute_tolerance = (
+            reconciliation.get("absolute_tolerance")
+            if isinstance(reconciliation, dict)
+            else None
+        )
+        relative_tolerance = (
+            reconciliation.get("relative_tolerance")
+            if isinstance(reconciliation, dict)
+            else None
+        )
+        if missing_fields or not (
+            is_finite_number(absolute_tolerance) or is_finite_number(relative_tolerance)
+        ):
+            tolerance_note = (
+                ""
+                if is_finite_number(absolute_tolerance)
+                or is_finite_number(relative_tolerance)
+                else "; at least one finite tolerance is required"
+            )
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} lacks required reconciliation fields {missing_fields}{tolerance_note}",
+                artifact_id=result_id,
+            )
+            return False
+
+        fixed_primary = reconciliation.get("fixed_primary_decisions")
+        reoptimized_auxiliary = reconciliation.get("reoptimized_auxiliary_variables")
+        fixed_set = set(fixed_primary) if isinstance(fixed_primary, list) else set()
+        auxiliary_set = (
+            set(reoptimized_auxiliary)
+            if isinstance(reoptimized_auxiliary, list)
+            else set()
+        )
+        model_symbol_ids = {
+            symbol.get("id")
+            for symbol in model.get("symbols", [])
+            if isinstance(symbol, dict) and isinstance(symbol.get("id"), str)
+        }
+        unknown_variables = (fixed_set | auxiliary_set).difference(model_symbol_ids)
+        if (
+            not fixed_set
+            or not auxiliary_set
+            or fixed_set.intersection(auxiliary_set)
+            or unknown_variables
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_SCOPE_INVALID",
+                (
+                    f"{result_id}/{check_ref} requires non-empty disjoint primary/auxiliary symbol sets; "
+                    f"overlap={sorted(fixed_set.intersection(auxiliary_set))}, "
+                    f"unknown={sorted(unknown_variables)}"
+                ),
+                artifact_id=result_id,
+            )
+            return False
+
+        reconciliation_code = reconciliation.get("reconciliation_code_file")
+        code_signature = (
+            reconciliation_code.get("path"),
+            reconciliation_code.get("sha256"),
+        ) if isinstance(reconciliation_code, dict) else None
+        experiment_code_signatures = {
+            (item.get("path"), item.get("sha256"))
+            for item in experiment.get("code_files", [])
+            if isinstance(item, dict)
+        }
+        if code_signature is None or code_signature not in experiment_code_signatures:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} reconciliation code and SHA-256 are not bound in experiment.code_files",
+                artifact_id=result_id,
+            )
+            return False
+        try:
+            reconciliation_path = safe_project_path(
+                self.root, reconciliation_code.get("path"), must_exist=True
+            )
+            entrypoint_path = safe_project_path(
+                self.root, model.get("algorithm", {}).get("entrypoint"), must_exist=True
+            )
+            same_as_entrypoint = reconciliation_path == entrypoint_path or os.path.samefile(
+                reconciliation_path, entrypoint_path
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} cannot resolve its independent code binding: {exc}",
+                artifact_id=result_id,
+            )
+            return False
+        if same_as_entrypoint:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_NOT_INDEPENDENT",
+                f"{result_id}/{check_ref} reuses the experiment's main model entrypoint",
+                artifact_id=result_id,
+            )
+            return False
+
+        objective_metric_ref = reconciliation.get("objective_metric_ref")
+        objective_spec = metric_specs.get(objective_metric_ref)
+        objective_rows = metric_rows.get(objective_metric_ref, [])
+        solver_objective = reconciliation.get("solver_objective")
+        best_response_objective = reconciliation.get("best_response_objective")
+        recorded_gain = reconciliation.get("repair_gain")
+        measurements = (solver_objective, best_response_objective, recorded_gain)
+        objective_unit = objective_spec.get("unit") if isinstance(objective_spec, dict) else None
+        direction = objective_spec.get("direction") if isinstance(objective_spec, dict) else None
+        if (
+            len(objective_rows) != 1
+            or direction not in {"minimize", "maximize"}
+            or not isinstance(objective_unit, str)
+            or any(
+                not isinstance(measurement, dict)
+                or not is_finite_number(measurement.get("value"))
+                or measurement.get("unit") != objective_unit
+                for measurement in measurements
+            )
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} must bind one finite minimize/maximize metric with consistent units",
+                artifact_id=result_id,
+            )
+            return False
+
+        result_objective = objective_rows[0].get("measurement", {})
+        solver_value = decimal_number(solver_objective["value"])
+        best_response_value = decimal_number(best_response_objective["value"])
+        result_objective_value = (
+            result_objective.get("value")
+            if isinstance(result_objective, dict)
+            else None
+        )
+        if (
+            not is_finite_number(result_objective_value)
+            or result_objective.get("unit") != objective_unit
+            or decimal_number(result_objective_value) != solver_value
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_MISMATCH",
+                f"{result_id}/{check_ref} solver_objective does not equal the registered result metric",
+                artifact_id=result_id,
+            )
+            return False
+
+        computed_gain = (
+            best_response_value - solver_value
+            if direction == "maximize"
+            else solver_value - best_response_value
+        )
+        registered_gain = decimal_number(recorded_gain["value"])
+        if registered_gain != computed_gain:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_MISMATCH",
+                f"{result_id}/{check_ref} records repair_gain {registered_gain}; objectives require {computed_gain}",
+                artifact_id=result_id,
+            )
+            return False
+
+        timing_valid = True
+        if reconciliation.get("registration_timing") == "post_result":
+            if experiment.get("mode") == "exploratory":
+                self.add(
+                    "G4",
+                    "WARN",
+                    "POST_HOC_OBJECTIVE_RECONCILIATION_TOLERANCE",
+                    f"{result_id}/{check_ref} tolerance was registered after results and is exploratory only",
+                    artifact_id=result_id,
+                )
+            else:
+                self.add(
+                    "G4",
+                    "BLOCK",
+                    "CONFIRMATORY_OBJECTIVE_RECONCILIATION_TOLERANCE_POST_HOC",
+                    f"{result_id}/{check_ref} cannot use a post-result tolerance as confirmatory evidence",
+                    artifact_id=result_id,
+                )
+                timing_valid = False
+
+        allowed_tolerances: list[Decimal] = []
+        if is_finite_number(absolute_tolerance):
+            allowed_tolerances.append(decimal_number(absolute_tolerance))
+        if is_finite_number(relative_tolerance):
+            scale = max(abs(solver_value), abs(best_response_value))
+            allowed_tolerances.append(decimal_number(relative_tolerance) * scale)
+        allowed_gain = max(allowed_tolerances)
+        if abs(computed_gain) > allowed_gain:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_REPAIR_GAIN_EXCEEDED",
+                (
+                    f"{result_id}/{check_ref} fixed-decision best response changes the {direction} "
+                    f"objective by {computed_gain} {objective_unit}; allowed magnitude is {allowed_gain}"
+                ),
+                artifact_id=result_id,
+            )
+            return False
+
+        self.add(
+            "G4",
+            "PASS",
+            "OBJECTIVE_RECONCILIATION_PASS",
+            f"{result_id}/{check_ref} repair_gain {computed_gain} is within tolerance {allowed_gain}",
+            artifact_id=result_id,
+        )
+        return timing_valid
 
     def validate_acceptance_rule(
         self,

@@ -75,7 +75,7 @@ def minimal_text_pdf(text: str) -> str:
 
 def artifact_base(kind: str, artifact_id: str, dependencies: list[str], author: str = "human") -> dict[str, Any]:
     return {
-        "schema_version": "2.1.0",
+        "schema_version": "2.2.0",
         "kind": kind,
         "id": artifact_id,
         "revision": 1,

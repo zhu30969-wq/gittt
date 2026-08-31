@@ -117,7 +117,7 @@ D:\WUMIAN\ZHUOMIAN\数学建模agent\cumcm-modeling\SKILL.md
 
 当前版本提供：
 
-当前模板生成的结构化契约版本为 `2.1.0`；工具继续读取和审计合法 `2.x.x`（包括旧 `2.0.0` 与 `2.0.1`），无参数重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 项目须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；应依据真实决策时序显式补值，工具不会静默推断或自动改写。
+当前模板生成的结构化契约版本为 `2.2.0`；工具继续读取和审计合法 `2.x.x`（包括旧 `2.0.0`、`2.0.1` 与 `2.1.0`），无参数重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 项目须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；旧 `2.1.x` optimization 模型缺少新引入的 `objective_reconciliation` 时，由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding。两类缺项都应依据真实语义显式补值，工具不会静默推断或自动改写。
 
 - `INTAKE → G0–G7 → SUBMISSION_READY` 单入口状态机；
 - 主模型、可信 baseline、风险探针和不可变 fallback 晋升；
