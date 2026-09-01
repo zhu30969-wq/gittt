@@ -126,6 +126,7 @@ cumcm-modeling/
 │   ├── cases/
 │   │   └── _TEMPLATE.md
 │   ├── team-collaboration.md
+│   ├── field-run-maintainability.md
 │   ├── rubric.md
 │   ├── paper-delivery.md
 │   ├── abstract.md
