@@ -159,6 +159,8 @@ tests/
 
 evals/
 ├── scenarios.yaml
+├── complete_chain_scenario.json
+├── run_complete_chain.py
 ├── held_out_resume_scenario.json
 └── run_held_out_resume.py
 ~~~

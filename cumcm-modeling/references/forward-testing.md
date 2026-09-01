@@ -12,7 +12,15 @@
 6. 至少保留一组从未用于调试的 held-out 场景；
 7. 测试不得自动删除成批文件，临时目录留存并报告位置。
 
-仓库提供一个可执行的离线恢复场景：
+仓库提供两个可执行的离线场景。E01 从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
+
+```bash
+python -X utf8 evals/run_complete_chain.py <new-target-path>
+```
+
+目标路径必须尚不存在。该 harness 保留初始化、完整、负向和恢复四份审计报告，以及负向 `results.yaml` 快照。正向链必须达到 `PASS / SUBMISSION_READY`，每个问题到达 final claim，定量 claim 绑定 eligible result，两份输出在预登记容差内重现，图表进入 paper 证据链。负向链保持 `solver_optimality` 通过，却因固定主决策后的独立最优响应超容差而触发 `OBJECTIVE_REPAIR_GAIN_EXCEEDED` 并令结果失去 eligibility；恢复原始结果字节后必须重新通过。
+
+E17 验证离线中断恢复：
 
 ```bash
 python -X utf8 evals/run_held_out_resume.py <new-target-path>
@@ -25,7 +33,7 @@ python -X utf8 evals/run_held_out_resume.py <new-target-path>
 - `executable`：仓库中存在真实 fixture 和可运行 harness，可报告本次实际运行结果；
 - `specification_only`：只定义待观察行为，不能声称已经完成独立 Agent 端到端评测。
 
-当前只有 E17 具备独立可执行 harness。E01–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
+当前 E01 与 E17 具备独立可执行 harness。E02–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
 
 ## P0 行为场景
 

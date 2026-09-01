@@ -263,6 +263,12 @@ jobs:
             exit 1
           fi
 
+      - name: Exercise E01 complete optimization evidence chain
+        shell: bash
+        run: |
+          python -X utf8 evals/run_complete_chain.py \
+            "$RUNNER_TEMP/cumcm-e01-complete-chain"
+
       - name: Exercise held-out non-overwriting recovery
         shell: bash
         run: |

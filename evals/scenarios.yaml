@@ -2,8 +2,9 @@ schema_version: "2.2.0"
 purpose: "Behavioral forward tests for the cumcm-modeling skill"
 scenarios:
   - id: "E01-complete-chain"
-    status: "specification_only"
-    fixture: "synthetic-small-problem"
+    status: "executable"
+    fixture: "complete_chain_scenario.json"
+    executable: "run_complete_chain.py"
     expected_invariants:
       - "Every question reaches at least one registered final claim."
       - "Every quantitative claim traces to a successful, current result."

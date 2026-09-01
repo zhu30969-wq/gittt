@@ -4026,10 +4026,12 @@ class Audit:
                         artifact_id=registry.get("id"),
                     )
                     continue
-                semantic_dependencies = {
-                    *figure.get("source_result_refs", []),
-                    *figure.get("claim_refs", []),
-                }
+                semantic_dependencies = set(figure.get("source_result_refs", []))
+                semantic_dependencies.update(
+                    self.id_definitions[reference][0]
+                    for reference in figure.get("claim_refs", [])
+                    if reference in self.id_definitions
+                )
                 missing_dependency_edges = semantic_dependencies.difference(registry_dependencies)
                 if missing_dependency_edges:
                     self.add(
