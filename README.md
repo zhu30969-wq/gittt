@@ -160,10 +160,17 @@ tests/
 
 evals/
 ├── scenarios.yaml
+├── _forward_scenario_support.py
 ├── complete_chain_scenario.json
 ├── run_complete_chain.py
 ├── held_out_resume_scenario.json
-└── run_held_out_resume.py
+├── run_held_out_resume.py
+├── hybrid_validation_facet_union_scenario.json
+├── run_hybrid_validation_facet_union.py
+├── scenario_set_holdout_isolation_scenario.json
+├── run_scenario_set_holdout_isolation.py
+├── decision_timing_comparability_scenario.json
+└── run_decision_timing_comparability.py
 ~~~
 
 ## 安装

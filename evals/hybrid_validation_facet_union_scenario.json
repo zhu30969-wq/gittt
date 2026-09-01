@@ -1,0 +1,13 @@
+{
+  "schema_version": "2.3.0",
+  "id": "E18-hybrid-validation-facet-union",
+  "fixture_profile": "e18-hybrid-validation-facet-union",
+  "facets": [
+    "optimization",
+    "simulation"
+  ],
+  "missing_facets_code": "VALIDATION_FACETS_REQUIRED",
+  "missing_union_code": "MODEL_VALIDATION_COVERAGE_UNDECLARED",
+  "optimization_escape_code": "MODEL_VALIDATION_COVERAGE_UNDECLARED",
+  "optimization_check_witness": "objective_reconciliation"
+}

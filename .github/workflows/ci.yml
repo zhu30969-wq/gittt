@@ -60,6 +60,9 @@ jobs:
             cumcm-modeling/scripts/*.py \
             tests/*.py
 
+      - name: Compile executable forward-test harnesses
+        run: python -X utf8 -m py_compile evals/*.py
+
       - name: Self-validate JSON Schemas and local references
         shell: bash
         run: |
@@ -275,6 +278,24 @@ jobs:
           python -X utf8 evals/run_held_out_resume.py \
             "$RUNNER_TEMP/cumcm-held-out-resume"
 
+      - name: Exercise E18 hybrid validation facet union
+        shell: bash
+        run: |
+          python -X utf8 evals/run_hybrid_validation_facet_union.py \
+            "$RUNNER_TEMP/cumcm-e18-hybrid-facets"
+
+      - name: Exercise E19 scenario holdout isolation
+        shell: bash
+        run: |
+          python -X utf8 evals/run_scenario_set_holdout_isolation.py \
+            "$RUNNER_TEMP/cumcm-e19-scenario-isolation"
+
+      - name: Exercise E20 decision timing comparability
+        shell: bash
+        run: |
+          python -X utf8 evals/run_decision_timing_comparability.py \
+            "$RUNNER_TEMP/cumcm-e20-decision-timing"
+
       - name: Positive paper lint
         run: |
           python -X utf8 cumcm-modeling/scripts/lint_paper.py \
@@ -347,6 +368,16 @@ jobs:
 
       - name: Run complete Windows unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Exercise executable mechanism scenarios on Windows
+        shell: pwsh
+        run: |
+          python -X utf8 evals/run_hybrid_validation_facet_union.py (Join-Path $env:RUNNER_TEMP 'cumcm-e18-hybrid-facets')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -X utf8 evals/run_scenario_set_holdout_isolation.py (Join-Path $env:RUNNER_TEMP 'cumcm-e19-scenario-isolation')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -X utf8 evals/run_decision_timing_comparability.py (Join-Path $env:RUNNER_TEMP 'cumcm-e20-decision-timing')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build and audit synthetic release on Windows
         shell: pwsh

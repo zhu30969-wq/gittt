@@ -62,8 +62,10 @@ def registered_scenario_sets(root: Path) -> list[dict[str, Any]]:
     ]
 
 
-def build_random_optimization_release(*, metric_role: str = "holdout") -> Path:
-    root = build_optimization_release()
+def build_random_optimization_release(
+    *, metric_role: str = "holdout", root: Path | None = None
+) -> Path:
+    root = build_optimization_release(root)
     SCENARIO_ROOTS.append(root)
 
     model = load_yaml(root / "specs/model_spec.yaml")

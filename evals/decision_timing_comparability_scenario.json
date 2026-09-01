@@ -1,0 +1,9 @@
+{
+  "schema_version": "2.3.0",
+  "id": "E20-decision-timing-comparability",
+  "fixture_profile": "e20-decision-timing-comparability",
+  "primary_timing": "here_and_now",
+  "incomparable_secondary_timing": "wait_and_see",
+  "comparable_secondary_timing": "here_and_now",
+  "expected_code": "DECISION_TIMING_MISMATCH"
+}

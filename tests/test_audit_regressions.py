@@ -86,8 +86,14 @@ def artifact_base(kind: str, artifact_id: str, dependencies: list[str], author: 
     }
 
 
-def build_release_project() -> Path:
-    root = Path(tempfile.mkdtemp(prefix="cumcm-audit-regression-"))
+def build_release_project(root: Path | None = None) -> Path:
+    if root is None:
+        root = Path(tempfile.mkdtemp(prefix="cumcm-audit-regression-"))
+    else:
+        root = root.resolve()
+        if root.exists():
+            raise FileExistsError(f"synthetic release target must be new: {root}")
+        root.mkdir(parents=True)
     CREATED_ROOTS.append(root)
     write_text(root, "inputs/problem.txt", "Synthetic modeling problem.\n")
     write_text(root, "code/main.py", "print('ok')\n")

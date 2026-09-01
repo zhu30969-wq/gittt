@@ -33,8 +33,8 @@ from audit_project import FORMULA_VALIDATION_CHECKS
 FOCUSED_ROOTS: list[Path] = []
 
 
-def fresh_release() -> Path:
-    root = build_release_project()
+def fresh_release(root: Path | None = None) -> Path:
+    root = build_release_project(root)
     FOCUSED_ROOTS.append(root)
     return root
 
@@ -118,8 +118,8 @@ def add_solver_result_evidence(
     write_yaml(root, "results/results.yaml", result)
 
 
-def build_hybrid_descriptive_release() -> Path:
-    root = fresh_release()
+def build_hybrid_descriptive_release(root: Path | None = None) -> Path:
+    root = fresh_release(root)
     model = load_yaml(root / "specs/model_spec.yaml")
     model["model_family"] = "hybrid"
     model["validation_facets"] = ["descriptive"]
@@ -128,8 +128,8 @@ def build_hybrid_descriptive_release() -> Path:
     return root
 
 
-def build_hybrid_union_release() -> Path:
-    root = fresh_release()
+def build_hybrid_union_release(root: Path | None = None) -> Path:
+    root = fresh_release(root)
     facets = ["optimization", "simulation"]
     required = set().union(*(VALIDATION_COVERAGE_BY_FAMILY[facet] for facet in facets))
 
@@ -143,8 +143,8 @@ def build_hybrid_union_release() -> Path:
     return root
 
 
-def build_optimization_release() -> Path:
-    root = build_hybrid_union_release()
+def build_optimization_release(root: Path | None = None) -> Path:
+    root = build_hybrid_union_release(root)
     model = load_yaml(root / "specs/model_spec.yaml")
     model["model_family"] = "optimization"
     model.pop("validation_facets", None)
@@ -190,8 +190,9 @@ def build_two_candidate_release(
     secondary_interval: tuple[float, float],
     primary_timing: str = "here_and_now",
     secondary_timing: str = "here_and_now",
+    root: Path | None = None,
 ) -> Path:
-    root = build_optimization_release()
+    root = build_optimization_release(root)
     secondary_output = "outputs/candidate-b.json"
     write_text(root, secondary_output, json.dumps({"score": 0.95}) + "\n")
 
