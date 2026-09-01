@@ -71,6 +71,7 @@ description: "Orchestrate, continue, or audit CUMCM（全国大学生数学建�
 - 每轮先检查已有证据，再执行当前阶段；不要用新叙述覆盖旧失败。
 - 比较模型时固定数据划分、指标和计算预算，避免只对某个模型有利的比较。
 - 随机算法按预先声明的种子和重复方案运行，不得反复运行直到出现满意结果。
+- 随机情景优化把选方案/调参用的 `selection` 情景与最终结论用的 `holdout` 情景分开登记，二者不得复用情景字节，final claim 只能绑定 holdout metric。
 - acceptance rule 必须记录 `registration_timing`。看到相关结果后才形成的规则只能标为 `post_result`，不得在论文中称为“预先”“预注册”或当作确认性检验；若需确认，应建立新的 confirmatory experiment 再运行。
 - 同一确定性技术错误可修复后重试；同一根因连续出现两次，或修改会影响已冻结解释和模型时，停止自动迭代并请求人工判断。
 - 声明 baseline 时必须实际建立同子问、同指标口径的实验与 eligible result；主结果必须绑定所采用的 baseline result，不能只在文字中写“优于基线”。

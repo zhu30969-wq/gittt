@@ -577,6 +577,7 @@ def main() -> int:
             ),
             validation_check("objective_reconciliation", applicability="required"),
             validation_check("baseline_comparison"),
+            validation_check("holdout_leakage"),
             validation_check("sensitivity"),
             validation_check("dimensional_consistency"),
             validation_check("domain_validity"),
@@ -890,7 +891,7 @@ def main() -> int:
     save_yaml(target, "figures/figures.yaml", figures)
 
     paper_build = {
-        "schema_version": "2.2.0",
+        "schema_version": "2.3.0",
         "kind": "paper_build",
         "id": "build:paper",
         "revision": 1,

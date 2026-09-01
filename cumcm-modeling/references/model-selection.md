@@ -78,7 +78,7 @@
 | `descriptive` | `input_integrity` |
 | `statistical` | `uncertainty`、`residual_diagnostics` |
 | `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
-| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`objective_reconciliation`、`sensitivity` |
+| `optimization` | `baseline_comparison`、`holdout_leakage`、`constraint_feasibility`、`solver_optimality`、`objective_reconciliation`、`sensitivity` |
 | `simulation` | `convergence`、`conservation_balance`、`numerical_stability`、`boundary_case` |
 | `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
 | `causal` | `uncertainty`、`identifiability`、`falsification` |

@@ -77,7 +77,7 @@ question → model → experiment → result → claim → figure/table/paper
 | descriptive | 输入完整性 |
 | statistical | 残差诊断、不确定性 |
 | prediction | 基线、泄漏、预测误差、不确定性 |
-| optimization | 约束可行性、求解状态/最优性、固定主决策后的目标对账、基线、敏感性 |
+| optimization | 约束可行性、求解状态/最优性、固定主决策后的目标对账、基线、情景泄漏、敏感性 |
 | simulation | 边界情形、收敛、守恒/平衡、数值稳定性 |
 | evaluation | 基线、敏感性、排名稳定性 |
 | causal | 可识别性、反证检查、不确定性 |
@@ -101,6 +101,8 @@ question → model → experiment → result → claim → figure/table/paper
 保存执行参数数组、相对工作目录、代码和环境哈希、随机种子、切分、基线、指标、接受规则、输出及比较器。`data_refs` 只能引用已经批准用于建模的数据；`baseline_refs` 必须与所选模型的 baseline policy 一致。基线模型还要有同子问、同指标定义的可比实验，不能只在文字中出现。
 
 `mode` 表示实验在证据流程中的用途（探索、确认或验证），`decision_timing` 表示决策相对于不确定信息何时作出，二者不重叠。`here_and_now` 在不确定性揭示前固定决策，`wait_and_see` 在情景揭示后再决策，`recourse` 允许获得部分信息后采取补救决策。跨结果的差值、排名或基线优越性判断只能比较相同 `decision_timing` 的实验。
+
+随机情景优化必须在 `scenario_sets` 中分别登记 `role: selection` 与 `role: holdout` 的非空情景集，并为每组保存种子、生成器 SHA-256 和情景字节 SHA-256。selection 用于选方案或调参，holdout 只用于冻结方案后的独立评价；两类集合不得复用相同的 `scenario_sha256`。每个定量 metric 用 `scenario_set_ref` 绑定其实际来源，final claim 只能引用来自本实验 holdout 情景集的 metric。确定性优化显式写 `scenario_sets: []`，并把 `holdout_leakage` 记为 `not_applicable` 且说明理由，不能伪造情景集。
 
 `code_files` 必须包含实际入口和本次实验依赖的项目代码；任何支持 release claim 的 eligible result，其全部 `code_files` 都必须在 manifest 中登记为 `required: true / role: code` 的 deliverable，不能只交入口脚本。
 

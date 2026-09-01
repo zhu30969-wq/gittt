@@ -33,13 +33,17 @@ from test_audit_regressions import (  # noqa: E402
 CREATED_ROOTS: list[Path] = []
 
 # Compatibility exemption: this literal deliberately remains at 2.0.0 after
-# current generators move to 2.2.0.  It proves that a valid 2.0.x predecessor
+# current generators move to 2.3.0.  It proves that a valid 2.0.x predecessor
 # remains readable and is never rewritten by a no-op initialization.
 LEGACY_2_0_COMPAT_VERSION = "2.0.0"
 
 # Compatibility fixture for the last 2.0.x contract generated before
 # decision_timing became mandatory in 2.1.0.
 LEGACY_2_0_1_COMPAT_VERSION = "2.0.1"
+
+# Compatibility fixture for the contract immediately before scenario_sets
+# became an explicit 2.3.0 experiment field.
+LEGACY_2_2_COMPAT_VERSION = "2.2.0"
 
 
 def new_target(prefix: str) -> Path:
@@ -796,8 +800,61 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         self.assertNotIn("FILE_HASH_MISMATCH", codes)
         self.assertNotIn("ARTIFACT_HASH_MISMATCH", codes)
 
-    def test_current_2_2_0_experiment_still_requires_decision_timing_in_schema(self) -> None:
-        """The legacy exception must not weaken newly generated 2.2 contracts."""
+    def test_legacy_2_2_without_scenario_sets_is_noop_and_auditable(self) -> None:
+        """A 2.2 project stays byte-stable and receives a semantic migration finding."""
+
+        target = new_target("cumcm-init-legacy-2-2-")
+        first_code, first_report = run_initializer(
+            target,
+            "--project-id",
+            "project:legacy-2-2",
+            "--contest-year",
+            "2038",
+        )
+        self.assertEqual(0, first_code, first_report)
+
+        def downgrade_contract(document: dict) -> None:
+            document["schema_version"] = LEGACY_2_2_COMPAT_VERSION
+            if document.get("kind") == "experiment":
+                document.pop("scenario_sets", None)
+                for metric in document["metrics"]:
+                    metric.pop("scenario_set_ref", None)
+
+        manifest = load_yaml(target / "manifest.yaml")
+        for artifact in manifest["artifacts"]:
+            mutate_yaml(target, artifact["path"], downgrade_contract)
+        mutate_yaml(
+            target,
+            "manifest.yaml",
+            lambda document: document.update(
+                schema_version=LEGACY_2_2_COMPAT_VERSION
+            ),
+        )
+        before = snapshot_tree(target)
+
+        code, report = run_initializer(target)
+
+        self.assertEqual(0, code, report)
+        self.assertEqual("PASS", report.get("status"), report)
+        self.assertEqual(before, snapshot_tree(target))
+        self.assertTrue(
+            all(item["status"] == "NOT_APPLICABLE" for item in report["findings"]),
+            report,
+        )
+
+        audit_code, audit_report = run_auditor(target)
+        codes = finding_codes(audit_report)
+        self.assertEqual(10, audit_code, audit_report)
+        self.assertEqual(before, snapshot_tree(target))
+        self.assertIn("SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED", codes)
+        self.assertNotIn("SCHEMA_INVALID", codes)
+        self.assertNotIn("SCHEMA_VERSION_UNSUPPORTED", codes)
+        self.assertNotIn("AUDIT_INTERNAL_ERROR", codes)
+        self.assertNotIn("FILE_HASH_MISMATCH", codes)
+        self.assertNotIn("ARTIFACT_HASH_MISMATCH", codes)
+
+    def test_current_2_3_0_experiment_still_requires_decision_timing_in_schema(self) -> None:
+        """The legacy exception must not weaken newly generated 2.3 contracts."""
 
         target = new_target("cumcm-init-current-decision-timing-")
         first_code, first_report = run_initializer(
@@ -809,7 +866,7 @@ class InitializationAndRunTimeTests(unittest.TestCase):
         )
         self.assertEqual(0, first_code, first_report)
         experiment = load_yaml(target / "experiments" / "experiment.yaml")
-        self.assertEqual("2.2.0", experiment["schema_version"])
+        self.assertEqual("2.3.0", experiment["schema_version"])
 
         mutate_yaml(
             target,

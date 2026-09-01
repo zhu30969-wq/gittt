@@ -118,6 +118,7 @@ VALIDATION_COVERAGE_BY_FAMILY: dict[str, set[str]] = {
         "solver_optimality",
         "objective_reconciliation",
         "baseline_comparison",
+        "holdout_leakage",
         "sensitivity",
     },
     "simulation": {"boundary_case", "convergence", "conservation_balance", "numerical_stability"},
@@ -134,6 +135,7 @@ VALIDATION_COVERAGE_BY_TASK: dict[str, set[str]] = {
 }
 FORMULA_VALIDATION_CHECKS = {"dimensional_consistency", "domain_validity", "formula_back_substitution"}
 OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION = (2, 2, 0)
+SCENARIO_SETS_INTRODUCED_VERSION = (2, 3, 0)
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 PAPER_COMPILERS_BY_ENGINE = {
     "latex": {"latexmk", "xelatex", "lualatex", "pdflatex", "tectonic"},
@@ -206,6 +208,17 @@ def effective_validation_facets(model: dict[str, Any]) -> set[str]:
     if model_family in VALIDATION_COVERAGE_BY_FAMILY:
         facets.add(str(model_family))
     return facets
+
+
+def scenario_holdout_is_actionable(model: dict[str, Any]) -> bool:
+    """Return whether the model predeclares a scenario holdout check to run."""
+
+    return any(
+        check.get("check_type") == "holdout_leakage"
+        and check.get("applicability") in {"required", "conditional"}
+        for check in model.get("validation_plan", {}).get("checks", [])
+        if isinstance(check, dict)
+    )
 
 
 def metric_signature(metric: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
@@ -1104,6 +1117,25 @@ class Audit:
                     f"{document.get('id')} schema_version={document.get('schema_version')!r} omits "
                     "decision_timing; explicitly declare here_and_now, wait_and_see, or recourse; "
                     "the auditor does not infer a default"
+                ),
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        if (
+            kind == "experiment"
+            and "scenario_sets" not in document
+            and (2, 0, 0)
+            <= contract_version_tuple(document)
+            < SCENARIO_SETS_INTRODUCED_VERSION
+        ):
+            self.add(
+                "G3",
+                "BLOCK",
+                "SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED",
+                (
+                    f"{document.get('id')} schema_version={document.get('schema_version')!r} predates "
+                    "the scenario_sets contract; add an explicit empty list for non-scenario work or "
+                    "register disjoint selection/holdout sets for scenario-based experiments"
                 ),
                 path=relative,
                 artifact_id=document.get("id"),
@@ -2434,6 +2466,24 @@ class Audit:
                     ),
                     artifact_id=model_id,
                 )
+            if (
+                "holdout_leakage" in missing_check_types
+                and "optimization" in validation_facets
+                and contract_version_tuple(model) < SCENARIO_SETS_INTRODUCED_VERSION
+            ):
+                missing_check_types.remove("holdout_leakage")
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "SCENARIO_HOLDOUT_CHECK_REQUIRED",
+                    (
+                        f"{model_id} schema_version={model.get('schema_version')!r} has optimization "
+                        "validation scope but predates the scenario selection/holdout requirement; "
+                        "declare holdout_leakage as actionable for scenario-based optimization or "
+                        "not_applicable with a deterministic rationale"
+                    ),
+                    artifact_id=model_id,
+                )
             if missing_check_types:
                 self.add(
                     "G2",
@@ -2533,6 +2583,10 @@ class Audit:
             experiment_questions = set(experiment.get("question_refs", []))
             experiment_data_refs = set(experiment.get("data_refs", []))
             output_ids = [item.get("id") for item in experiment.get("outputs", [])]
+            scenario_sets = [
+                row for row in experiment.get("scenario_sets", []) if isinstance(row, dict)
+            ]
+            scenario_ids = [row.get("id") for row in scenario_sets]
             for metric in experiment.get("metrics", []):
                 matches = output_ids.count(metric.get("source_output_ref"))
                 if matches != 1:
@@ -2543,6 +2597,86 @@ class Audit:
                         f"{experiment_id}/{metric.get('id')} source_output_ref must resolve exactly once in this experiment; found {matches}",
                         artifact_id=experiment_id,
                     )
+                scenario_set_ref = metric.get("scenario_set_ref")
+                if scenario_set_ref is not None and scenario_ids.count(scenario_set_ref) != 1:
+                    self.add(
+                        "G3",
+                        "BLOCK",
+                        "METRIC_SCENARIO_SET_NOT_LOCAL",
+                        (
+                            f"{experiment_id}/{metric.get('id')} scenario_set_ref must resolve "
+                            f"exactly once in this experiment; found {scenario_ids.count(scenario_set_ref)}"
+                        ),
+                        artifact_id=experiment_id,
+                    )
+            optimization_scope = bool(
+                model is not None and "optimization" in effective_validation_facets(model)
+            )
+            scenario_holdout_required = bool(
+                optimization_scope
+                and model is not None
+                and scenario_holdout_is_actionable(model)
+            )
+            if optimization_scope and scenario_sets and not scenario_holdout_required:
+                self.add(
+                    "G3",
+                    "BLOCK",
+                    "SCENARIO_HOLDOUT_CHECK_INAPPLICABLE",
+                    (
+                        f"{experiment_id} registers scenario_sets but its optimization model does not "
+                        "declare holdout_leakage as required or conditional"
+                    ),
+                    artifact_id=experiment_id,
+                )
+            if scenario_holdout_required:
+                if not scenario_sets:
+                    self.add(
+                        "G3",
+                        "BLOCK",
+                        "SCENARIO_SETS_REQUIRED",
+                        (
+                            f"{experiment_id} is scenario-based optimization but does not register "
+                            "selection and holdout scenario sets"
+                        ),
+                        artifact_id=experiment_id,
+                    )
+                else:
+                    roles = {row.get("role") for row in scenario_sets}
+                    missing_roles = {"selection", "holdout"}.difference(roles)
+                    if missing_roles:
+                        self.add(
+                            "G3",
+                            "BLOCK",
+                            "SCENARIO_SET_ROLE_COVERAGE_MISSING",
+                            f"{experiment_id} lacks scenario roles {sorted(missing_roles)}",
+                            artifact_id=experiment_id,
+                        )
+                    selection_hashes = {
+                        row.get("scenario_sha256")
+                        for row in scenario_sets
+                        if row.get("role") == "selection"
+                    }
+                    holdout_hashes = {
+                        row.get("scenario_sha256")
+                        for row in scenario_sets
+                        if row.get("role") == "holdout"
+                    }
+                    overlap = sorted(
+                        value
+                        for value in selection_hashes.intersection(holdout_hashes)
+                        if isinstance(value, str)
+                    )
+                    if overlap:
+                        self.add(
+                            "G3",
+                            "BLOCK",
+                            "SCENARIO_SET_HASH_OVERLAP",
+                            (
+                                f"{experiment_id} reuses scenario_sha256 across selection and holdout: "
+                                f"{overlap}"
+                            ),
+                            artifact_id=experiment_id,
+                        )
             if experiment.get("model_ref") not in experiment.get("depends_on", []):
                 self.add(
                     "G3",
@@ -5040,6 +5174,62 @@ class Audit:
                         self.add("G5", "BLOCK", code, f"{claim.get('id')} has {len(matches)} directly evidenced values for {metric_ref}", artifact_id=registry.get("id"))
                         continue
                     result_id, metric = matches[0]
+                    assertion_result = result_by_id.get(result_id, {})
+                    assertion_experiment = experiment_by_id.get(
+                        assertion_result.get("experiment_ref"), {}
+                    )
+                    assertion_model = self.documents.get(
+                        assertion_experiment.get("model_ref"), {}
+                    )
+                    if (
+                        "optimization" in effective_validation_facets(assertion_model)
+                        and scenario_holdout_is_actionable(assertion_model)
+                    ):
+                        metric_spec = next(
+                            (
+                                row
+                                for row in assertion_experiment.get("metrics", [])
+                                if row.get("id") == metric_ref
+                            ),
+                            None,
+                        )
+                        scenario_set_ref = (
+                            metric_spec.get("scenario_set_ref")
+                            if isinstance(metric_spec, dict)
+                            else None
+                        )
+                        scenario_set = next(
+                            (
+                                row
+                                for row in assertion_experiment.get("scenario_sets", [])
+                                if isinstance(row, dict)
+                                and row.get("id") == scenario_set_ref
+                            ),
+                            None,
+                        )
+                        if scenario_set is None:
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "FINAL_CLAIM_METRIC_SCENARIO_UNBOUND",
+                                (
+                                    f"{claim.get('id')}/{metric_ref} does not bind a local holdout "
+                                    "scenario set"
+                                ),
+                                artifact_id=registry.get("id"),
+                            )
+                        elif scenario_set.get("role") != "holdout":
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "FINAL_CLAIM_SELECTION_SCENARIO_METRIC",
+                                (
+                                    f"{claim.get('id')}/{metric_ref} is sourced from "
+                                    f"{scenario_set_ref} role={scenario_set.get('role')!r}; final claims "
+                                    "must use holdout metrics"
+                                ),
+                                artifact_id=registry.get("id"),
+                            )
                     measurement = metric.get("measurement", {})
                     values = (
                         measurement.get("value"),
@@ -6330,6 +6520,7 @@ def definition_semantic_kind(document_kind: str | None, location: str) -> str:
         (r"/symbols/\d+/(?:id)$", "symbol"),
         (r"/formulation/(?:equations|objectives|constraints)/\d+/(?:id)$", "formula"),
         (r"/validation_plan/checks/\d+/(?:id)$", "validation_check"),
+        (r"/scenario_sets/\d+/(?:id)$", "scenario_set"),
         (r"/baseline_comparison_rules/\d+/(?:id)$", "comparison_rule"),
         (r"/metrics/\d+/(?:id)$", "metric"),
         (r"/outputs/\d+/(?:id)$", "output"),
@@ -6372,6 +6563,8 @@ def expected_reference_kinds(source_kind: str | None, location: str) -> set[str]
         return {"competition_profile"}
     if location.endswith("/comparison_rule_ref"):
         return {"comparison_rule"}
+    if location.endswith("/scenario_set_ref"):
+        return {"scenario_set"}
     if location.endswith("/baseline_result_ref") or location.endswith("/producer_ref") or location.endswith("/trigger_result_ref"):
         return {"results"}
     if location.endswith("/symbol_ref"):

@@ -1,5 +1,7 @@
 # Normalize repository text files to LF. Source files are authored as UTF-8.
 * text=auto
+.gitattributes text eol=lf
+.gitignore text eol=lf
 
 *.md text eol=lf
 *.yaml text eol=lf

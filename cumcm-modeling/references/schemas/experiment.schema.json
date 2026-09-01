@@ -12,6 +12,15 @@
         "required": ["schema_version"]
       },
       "else": {"required": ["decision_timing"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"type": "string", "pattern": "^2\\.[0-2]\\.[0-9]+$"}
+        },
+        "required": ["schema_version"]
+      },
+      "else": {"required": ["scenario_sets"]}
     }
   ],
   "type": "object",
@@ -49,6 +58,21 @@
     "repetitions": {"type": "integer", "minimum": 1},
     "parameters": {"type": "object"},
     "split_strategy": {"type": "string", "minLength": 1},
+    "scenario_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/typedId"},
+          "role": {"type": "string", "enum": ["selection", "holdout"]},
+          "seed": {"type": "integer"},
+          "generator_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
+          "scenario_sha256": {"$ref": "common.schema.json#/$defs/sha256"}
+        },
+        "required": ["id", "role", "seed", "generator_sha256", "scenario_sha256"]
+      }
+    },
     "baseline_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/typedId"}, "uniqueItems": true},
     "baseline_comparison_rules": {
       "type": "array",
@@ -81,6 +105,12 @@
           "direction": {"type": "string", "enum": ["minimize", "maximize", "target", "descriptive"]},
           "unit": {"$ref": "common.schema.json#/$defs/nonBlankString"},
           "aggregation": {"type": "string", "minLength": 1},
+          "scenario_set_ref": {
+            "oneOf": [
+              {"$ref": "common.schema.json#/$defs/typedId"},
+              {"type": "null"}
+            ]
+          },
           "source_output_ref": {"$ref": "common.schema.json#/$defs/typedId"},
           "extractor": {
             "oneOf": [

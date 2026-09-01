@@ -1,4 +1,4 @@
-schema_version: 2.2.0
+schema_version: 2.3.0
 kind: experiment
 id: experiment:main
 revision: 1
@@ -29,6 +29,7 @@ seeds: [__DEFAULT_SEED__]
 repetitions: 1
 parameters: {}
 split_strategy: "不适用时说明原因；预测任务必须写明时间或样本切分。"
+scenario_sets: []
 baseline_refs: []
 baseline_comparison_rules: []
 metrics:
@@ -37,6 +38,7 @@ metrics:
     direction: descriptive
     unit: "1"
     aggregation: "说明聚合方法。"
+    scenario_set_ref: null
     source_output_ref: output:primary
     extractor:
       type: json_pointer

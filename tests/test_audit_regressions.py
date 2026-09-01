@@ -75,7 +75,7 @@ def minimal_text_pdf(text: str) -> str:
 
 def artifact_base(kind: str, artifact_id: str, dependencies: list[str], author: str = "human") -> dict[str, Any]:
     return {
-        "schema_version": "2.2.0",
+        "schema_version": "2.3.0",
         "kind": kind,
         "id": artifact_id,
         "revision": 1,
@@ -226,6 +226,7 @@ def build_release_project() -> Path:
             "repetitions": 1,
             "parameters": {},
             "split_strategy": "Not applicable to deterministic fixture.",
+            "scenario_sets": [],
             "baseline_refs": [],
             "baseline_comparison_rules": [],
             "metrics": [
@@ -235,6 +236,7 @@ def build_release_project() -> Path:
                     "direction": "maximize",
                     "unit": "1",
                     "aggregation": "single run",
+                    "scenario_set_ref": None,
                     "source_output_ref": "output:primary",
                     "extractor": {"type": "json_pointer", "pointer": "/score"},
                 }
