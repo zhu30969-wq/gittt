@@ -12,13 +12,21 @@
 6. 至少保留一组从未用于调试的 held-out 场景；
 7. 测试不得自动删除成批文件，临时目录留存并报告位置。
 
-仓库提供五个可执行的离线场景。E01 从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
+仓库提供六个可执行的离线场景。E01 从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
 
 ```bash
 python -X utf8 evals/run_complete_chain.py <new-target-path>
 ```
 
 目标路径必须尚不存在。该 harness 保留初始化、完整、负向和恢复四份审计报告，以及负向 `results.yaml` 快照。正向链必须达到 `PASS / SUBMISSION_READY`，每个问题到达 final claim，定量 claim 绑定 eligible result，两份输出在预登记容差内重现，图表进入 paper 证据链。负向链保持 `solver_optimality` 通过，却因固定主决策后的独立最优响应超容差而触发 `OBJECTIVE_REPAIR_GAIN_EXCEEDED` 并令结果失去 eligibility；恢复原始结果字节后必须重新通过。
+
+E03 验证启发式优化的约束回代与最优性措辞：
+
+```bash
+python -X utf8 evals/run_heuristic_optimum.py <new-target-path>
+```
+
+该 harness 从完整合成 optimization release 构造固定预算候选搜索，移除全局上下界证书，并保留正向、约束超限和无效证明三份项目。正向项目的每条约束由预登记数值阈值回代，结论只写“当前找到的最好可行候选”；约束超限必须触发 `DIAGNOSTIC_THRESHOLD_FAILED` 并令 result 失去资格；把结论升级为“全局最优”并附上不可核验的证明材料时，必须触发 `PROOF_ARTIFACT_INVALID`。
 
 E17 验证离线中断恢复：
 
@@ -57,7 +65,7 @@ python -X utf8 evals/run_decision_timing_comparability.py <new-target-path>
 - `executable`：仓库中存在真实 fixture 和可运行 harness，可报告本次实际运行结果；
 - `specification_only`：只定义待观察行为，不能声称已经完成独立 Agent 端到端评测。
 
-当前 E01、E17、E18、E19 与 E20 具备独立可执行 harness。E02–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
+当前 E01、E03、E17、E18、E19 与 E20 具备独立可执行 harness。E02 与 E04–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
 
 ## P0 行为场景
 
@@ -96,7 +104,6 @@ python -X utf8 evals/run_decision_timing_comparability.py <new-target-path>
 后续至少需要为以下行为补齐独立材料、fixture、harness 和结果判定，完成前保持 `specification_only`：
 
 - 时序预测泄漏与时间顺序验证；
-- 启发式优化约束回代与最优性措辞；
 - 综合评价中的权重扰动和排名翻转；
 - 数据、结果模板、说明与参考资料混合目录的输入角色识别。
 
