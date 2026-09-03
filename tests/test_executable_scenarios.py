@@ -14,6 +14,7 @@ EVAL_ROOT = REPO_ROOT / "evals"
 EXPECTED_EXECUTABLE_IDS = {
     "E01-complete-chain",
     "E03-heuristic-optimum",
+    "E11-baseline-evidence",
     "E17-held-out-resume",
     "E18-hybrid-validation-facet-union",
     "E19-scenario-set-holdout-isolation",
@@ -46,7 +47,7 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         for scenario in self.scenarios():
             by_status.setdefault(scenario["status"], []).append(scenario)
 
-        self.assertEqual(14, len(by_status.get("specification_only", [])))
+        self.assertEqual(13, len(by_status.get("specification_only", [])))
         executable = by_status.get("executable", [])
         self.assertEqual(
             EXPECTED_EXECUTABLE_IDS,
@@ -114,6 +115,27 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         )
         self.assertIn("best feasible", config["supported_claim_statement"].lower())
         self.assertIn("globally optimal", config["unsupported_claim_statement"].lower())
+
+    def test_e11_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E11-baseline-evidence")
+        self.assertEqual("BASELINE_TASK_MISMATCH", config["coverage_failure_code"])
+        self.assertEqual(
+            "BASELINE_EXPERIMENT_NOT_COMPARABLE",
+            config["comparability_failure_code"],
+        )
+        self.assertEqual(
+            "BASELINE_BINDING_METRIC_MISMATCH",
+            config["metric_mismatch_code"],
+        )
+        self.assertEqual("BASELINE_RESULT_ELIGIBLE", config["eligible_code"])
+        self.assertEqual(
+            {
+                "ARTIFACT_HASH_MISMATCH",
+                "RESULT_FINGERPRINT_STALE",
+                "UPSTREAM_STALE",
+            },
+            set(config["stale_codes"]),
+        )
 
     def test_e18_config_matches_the_registry_contract(self) -> None:
         config = self.fixture_for("E18-hybrid-validation-facet-union")

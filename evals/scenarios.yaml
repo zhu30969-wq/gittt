@@ -68,8 +68,9 @@ scenarios:
       - "A filename heuristic remains unconfirmed until content or a human review establishes the role."
       - "Bundled modeling inputs are immutable and appear in the result input ledger with matching hashes."
   - id: "E11-baseline-evidence"
-    status: "specification_only"
-    fixture: "primary-and-simple-baseline"
+    status: "executable"
+    fixture: "baseline_evidence_scenario.json"
+    executable: "run_baseline_evidence.py"
     expected_invariants:
       - "The baseline covers every compared question and uses a comparable metric definition."
       - "Both primary and baseline have eligible runs; the primary result depends on the exact baseline result used."
