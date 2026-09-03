@@ -1,0 +1,17 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E11-baseline-evidence",
+  "fixture_profile": "e11-primary-and-simple-baseline",
+  "coverage_failure_code": "BASELINE_TASK_MISMATCH",
+  "comparability_failure_code": "BASELINE_EXPERIMENT_NOT_COMPARABLE",
+  "metric_mismatch_code": "BASELINE_BINDING_METRIC_MISMATCH",
+  "eligible_code": "BASELINE_RESULT_ELIGIBLE",
+  "stale_codes": [
+    "ARTIFACT_HASH_MISMATCH",
+    "RESULT_FINGERPRINT_STALE",
+    "UPSTREAM_STALE"
+  ],
+  "ineligible_claim_code": "FINAL_CLAIM_INELIGIBLE_RESULT",
+  "primary_result_id": "result:main",
+  "baseline_result_id": "result:baseline"
+}

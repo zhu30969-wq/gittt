@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E12-structured-diagnostic",
+  "fixture_profile": "structured-diagnostic-release",
+  "observed_score": 0.95,
+  "passing_operator": "==",
+  "contradictory_operator": ">=",
+  "contradictory_threshold": 1.0,
+  "evidence_ambiguity_code": "VALIDATION_CHECK_EVIDENCE_AMBIGUOUS",
+  "status_mismatch_code": "DIAGNOSTIC_STATUS_MISMATCH",
+  "threshold_pass_code": "DIAGNOSTIC_THRESHOLD_PASS"
+}

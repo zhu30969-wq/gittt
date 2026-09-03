@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E03-heuristic-optimum",
+  "fixture_profile": "e03-heuristic-optimum",
+  "base_fixture_profile": "e01-optimization",
+  "supported_claim_statement": "Within the registered candidate budget, the best feasible objective found is 1.25.",
+  "unsupported_claim_statement": "The heuristic candidate is the globally optimal solution.",
+  "infeasible_constraint_violation": 0.25,
+  "constraint_failure_code": "DIAGNOSTIC_THRESHOLD_FAILED",
+  "ineligible_result_code": "REQUIRED_DIAGNOSTIC_NOT_PASS",
+  "unsupported_global_claim_code": "PROOF_ARTIFACT_INVALID"
+}

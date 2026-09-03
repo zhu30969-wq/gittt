@@ -13,6 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_ROOT = REPO_ROOT / "evals"
 EXPECTED_EXECUTABLE_IDS = {
     "E01-complete-chain",
+    "E03-heuristic-optimum",
+    "E11-baseline-evidence",
+    "E12-structured-diagnostic",
     "E17-held-out-resume",
     "E18-hybrid-validation-facet-union",
     "E19-scenario-set-holdout-isolation",
@@ -45,7 +48,7 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         for scenario in self.scenarios():
             by_status.setdefault(scenario["status"], []).append(scenario)
 
-        self.assertEqual(15, len(by_status.get("specification_only", [])))
+        self.assertEqual(12, len(by_status.get("specification_only", [])))
         executable = by_status.get("executable", [])
         self.assertEqual(
             EXPECTED_EXECUTABLE_IDS,
@@ -98,6 +101,64 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         self.assertIn("same result", orthogonality[0])
         self.assertIn("passes", orthogonality[0])
         self.assertIn("blocks", orthogonality[0])
+
+    def test_e03_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E03-heuristic-optimum")
+        self.assertEqual("e01-optimization", config["base_fixture_profile"])
+        self.assertGreater(config["infeasible_constraint_violation"], 0)
+        self.assertEqual(
+            "DIAGNOSTIC_THRESHOLD_FAILED",
+            config["constraint_failure_code"],
+        )
+        self.assertEqual(
+            "PROOF_ARTIFACT_INVALID",
+            config["unsupported_global_claim_code"],
+        )
+        self.assertIn("best feasible", config["supported_claim_statement"].lower())
+        self.assertIn("globally optimal", config["unsupported_claim_statement"].lower())
+
+    def test_e11_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E11-baseline-evidence")
+        self.assertEqual("BASELINE_TASK_MISMATCH", config["coverage_failure_code"])
+        self.assertEqual(
+            "BASELINE_EXPERIMENT_NOT_COMPARABLE",
+            config["comparability_failure_code"],
+        )
+        self.assertEqual(
+            "BASELINE_BINDING_METRIC_MISMATCH",
+            config["metric_mismatch_code"],
+        )
+        self.assertEqual("BASELINE_RESULT_ELIGIBLE", config["eligible_code"])
+        self.assertEqual(
+            {
+                "ARTIFACT_HASH_MISMATCH",
+                "RESULT_FINGERPRINT_STALE",
+                "UPSTREAM_STALE",
+            },
+            set(config["stale_codes"]),
+        )
+
+    def test_e12_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E12-structured-diagnostic")
+        self.assertEqual(0.95, config["observed_score"])
+        self.assertEqual("==", config["passing_operator"])
+        self.assertEqual(">=", config["contradictory_operator"])
+        self.assertGreater(
+            config["contradictory_threshold"],
+            config["observed_score"],
+        )
+        self.assertEqual(
+            "VALIDATION_CHECK_EVIDENCE_AMBIGUOUS",
+            config["evidence_ambiguity_code"],
+        )
+        self.assertEqual(
+            "DIAGNOSTIC_STATUS_MISMATCH",
+            config["status_mismatch_code"],
+        )
+        self.assertEqual(
+            "DIAGNOSTIC_THRESHOLD_PASS",
+            config["threshold_pass_code"],
+        )
 
     def test_e18_config_matches_the_registry_contract(self) -> None:
         config = self.fixture_for("E18-hybrid-validation-facet-union")
