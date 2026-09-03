@@ -136,6 +136,7 @@ VALIDATION_COVERAGE_BY_TASK: dict[str, set[str]] = {
 FORMULA_VALIDATION_CHECKS = {"dimensional_consistency", "domain_validity", "formula_back_substitution"}
 OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION = (2, 2, 0)
 SCENARIO_SETS_INTRODUCED_VERSION = (2, 3, 0)
+MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION = (2, 4, 0)
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 PAPER_COMPILERS_BY_ENGINE = {
     "latex": {"latexmk", "xelatex", "lualatex", "pdflatex", "tectonic"},
@@ -255,6 +256,14 @@ def contract_version_tuple(document: dict[str, Any]) -> tuple[int, int, int]:
     if match is None:
         return (0, 0, 0)
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
+
+
+def model_evidence_consistency_code(model: dict[str, Any], current_code: str) -> str:
+    """Keep pre-2.4 contracts readable while naming their required migration."""
+
+    if contract_version_tuple(model) < MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION:
+        return f"{current_code}_MIGRATION_REQUIRED"
+    return current_code
 
 
 def experiments_are_comparable(primary: dict[str, Any], baseline: dict[str, Any]) -> bool:
@@ -1963,6 +1972,30 @@ class Audit:
         models_by_id = {document.get("id"): document for document in models}
         experiments_by_id = {document.get("id"): document for document in experiments}
         results_by_id = {document.get("id"): document for document in results}
+        quantitative_final_claims_by_model: dict[str, set[str]] = defaultdict(set)
+        for registry in claims_docs:
+            for claim in registry.get("claims", []):
+                claim_id = claim.get("id")
+                if (
+                    claim.get("publication_status") != "final"
+                    or not claim.get("numeric_assertions")
+                    or not isinstance(claim_id, str)
+                ):
+                    continue
+                for evidence in claim.get("evidence_refs", []):
+                    if not isinstance(evidence, dict):
+                        continue
+                    evidence_ref = evidence.get("ref")
+                    if evidence_ref in models_by_id:
+                        quantitative_final_claims_by_model[str(evidence_ref)].add(claim_id)
+                        continue
+                    result = results_by_id.get(evidence_ref)
+                    if not isinstance(result, dict):
+                        continue
+                    experiment = experiments_by_id.get(result.get("experiment_ref"))
+                    model_ref = experiment.get("model_ref") if isinstance(experiment, dict) else None
+                    if model_ref in models_by_id:
+                        quantitative_final_claims_by_model[str(model_ref)].add(claim_id)
         self.validate_model_promotions(promotions, models_by_id, experiments_by_id, results_by_id)
         question_owner_by_id: dict[str, str] = {}
         questions_by_id: dict[str, dict[str, Any]] = {}
@@ -2282,6 +2315,31 @@ class Audit:
                         f"{model_id} lists but does not bind formulas to hard constraints {sorted(missing_formulations)}",
                         artifact_id=model_id,
                     )
+            quantitative_claim_ids = quantitative_final_claims_by_model.get(str(model_id), set())
+            formulation = model.get("formulation", {})
+            if quantitative_claim_ids and not any(
+                formulation.get(section) for section in ("equations", "objectives", "constraints")
+            ):
+                code = model_evidence_consistency_code(
+                    model, "EMPTY_FORMULATION_SUPPORTS_CLAIM"
+                )
+                migration_note = (
+                    f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                    "model/claim consistency contract and must be migrated;"
+                    if code.endswith("_MIGRATION_REQUIRED")
+                    else ""
+                )
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    code,
+                    (
+                        f"{model_id}{migration_note} equations, objectives, and constraints are all "
+                        f"empty while supporting final quantitative claims {sorted(quantitative_claim_ids)}; "
+                        "declare at least one formulation item"
+                    ),
+                    artifact_id=model_id,
+                )
             for section in ("equations", "objectives", "constraints"):
                 for formula in model.get("formulation", {}).get(section, []):
                     for symbol_ref in [*formula.get("defines", []), *formula.get("uses", [])]:
@@ -2609,6 +2667,36 @@ class Audit:
                         ),
                         artifact_id=experiment_id,
                     )
+            optimization_metric_signals = [
+                f"{metric.get('id')} direction={metric.get('direction')}"
+                for metric in experiment.get("metrics", [])
+                if metric.get("direction") in {"minimize", "maximize"}
+            ]
+            if (
+                model is not None
+                and optimization_metric_signals
+                and "optimization" not in effective_validation_facets(model)
+            ):
+                code = model_evidence_consistency_code(model, "FAMILY_EVIDENCE_MISMATCH")
+                migration_note = (
+                    f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                    "family/evidence consistency contract and must be migrated;"
+                    if code.endswith("_MIGRATION_REQUIRED")
+                    else ""
+                )
+                self.add(
+                    "G3",
+                    "BLOCK",
+                    code,
+                    (
+                        f"{model.get('id')}{migration_note} experiment {experiment_id} triggers the "
+                        f"optimization-metric signal {optimization_metric_signals}; "
+                        f"model_family={model.get('model_family')!r}, "
+                        f"validation_facets={model.get('validation_facets', [])!r}; add the "
+                        "'optimization' validation facet"
+                    ),
+                    artifact_id=experiment_id,
+                )
             optimization_scope = bool(
                 model is not None and "optimization" in effective_validation_facets(model)
             )
@@ -2951,7 +3039,51 @@ class Audit:
             if model is None:
                 self.add("G4", "BLOCK", "RESULT_MODEL_MISSING", f"{result_id} experiment model does not resolve", artifact_id=result_id)
                 eligible = False
-            elif successful and (
+            else:
+                result_optimization_signals: list[str] = []
+                for diagnostic in result.get("diagnostics", []):
+                    if not isinstance(diagnostic, dict):
+                        continue
+                    diagnostic_id = diagnostic.get("id")
+                    if (
+                        "objective_incumbent" in diagnostic
+                        and "objective_bound" in diagnostic
+                    ):
+                        result_optimization_signals.append(
+                            f"objective_incumbent/objective_bound in {diagnostic_id}"
+                        )
+                    if "objective_reconciliation" in diagnostic:
+                        result_optimization_signals.append(
+                            f"objective_reconciliation in {diagnostic_id}"
+                        )
+                if (
+                    result_optimization_signals
+                    and "optimization" not in effective_validation_facets(model)
+                ):
+                    code = model_evidence_consistency_code(
+                        model, "FAMILY_EVIDENCE_MISMATCH"
+                    )
+                    migration_note = (
+                        f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                        "family/evidence consistency contract and must be migrated;"
+                        if code.endswith("_MIGRATION_REQUIRED")
+                        else ""
+                    )
+                    self.add(
+                        "G4",
+                        "BLOCK",
+                        code,
+                        (
+                            f"{model.get('id')}{migration_note} result {result_id} from experiment "
+                            f"{experiment.get('id')} triggers optimization evidence "
+                            f"{result_optimization_signals}; model_family={model.get('model_family')!r}, "
+                            f"validation_facets={model.get('validation_facets', [])!r}; add the "
+                            "'optimization' validation facet"
+                        ),
+                        artifact_id=result_id,
+                    )
+                    eligible = False
+            if model is not None and successful and (
                 model.get("method_selection", {}).get("decision") != "selected"
                 and str(model.get("id")) not in self.effective_primary_model_ids
             ):

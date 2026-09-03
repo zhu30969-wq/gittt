@@ -25,6 +25,7 @@ SCRIPTS = SKILL_ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from _contract_support import load_yaml, sha256_file, write_text_exclusive, write_yaml_atomic  # noqa: E402
+from audit_project import FORMULA_VALIDATION_CHECKS  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -468,6 +469,18 @@ def main() -> int:
             "transformation": "Identity transformation after parsing the registered text scalar.",
         }
     ]
+    if not e01_optimization:
+        model["formulation"]["equations"] = [
+            {
+                "id": "formula:identity",
+                "expression": "x = 1.25",
+                "format": "plain",
+                "defines": [],
+                "uses": ["symbol:x"],
+                "source_constraint_refs": [],
+                "interpretation": "Bind the synthetic output used by the final numeric claim.",
+            }
+        ]
     if e01_optimization:
         model["model_family"] = "optimization"
         model["method_selection"]["rationale"] = (
@@ -583,6 +596,11 @@ def main() -> int:
             validation_check("domain_validity"),
             validation_check("formula_back_substitution"),
         ]
+    else:
+        model["validation_plan"]["checks"].extend(
+            validation_check(check_type)
+            for check_type in sorted(FORMULA_VALIDATION_CHECKS)
+        )
     model["applicability"] = "Only this synthetic integration fixture."
     model["failure_modes"] = ["A mutated file or mismatched value must fail the audit."]
     save_yaml(target, "specs/model_spec.yaml", model)
@@ -891,7 +909,7 @@ def main() -> int:
     save_yaml(target, "figures/figures.yaml", figures)
 
     paper_build = {
-        "schema_version": "2.3.0",
+        "schema_version": "2.4.0",
         "kind": "paper_build",
         "id": "build:paper",
         "revision": 1,

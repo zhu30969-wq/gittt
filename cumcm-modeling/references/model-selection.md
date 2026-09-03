@@ -107,6 +107,8 @@
 - **未被族、任务或公式规则自动要求的 `validationCheckType`**：`seed_stability`、`reproducibility`、`other`。其中 `seed_stability` 对随机算法是关键检查，目前完全依赖人工在 `validation_plan.checks` 中主动声明；`reproducibility` 与 `other` 同样不会被自动补入。
 <!-- END GENERATED: validation-matrix -->
 
+除题型映射外，审计器还核对声明与实际证据。从 `2.4.0` 起，final 定量 claim 直接或经 result 使用的模型不得让 `equations`、`objectives`、`constraints` 同时为空；实验 metric 的 `direction` 为 `minimize`/`maximize`，或结果诊断登记成对求解器目标界、`objective_reconciliation` 时，有效验证 facets 必须包含 `optimization`。这些信号只把宽松声明提升到证据实际需要的检查面；已主动声明 `optimization` 但尚无上述信号不会被反向判错。
+
 条件性判断必须转成 `validation_plan.checks`，不能只留在论文写作清单里。每项检查预先声明适用性、阻断性、过程、通过规则、可选数值阈值和失败响应；运行后由 `results.diagnostics` 一对一报告。`not_applicable` 表示团队明确判断该检查不适用，不等于忘记填写。
 
 ### 预测与推断

@@ -84,6 +84,10 @@ question → model → experiment → result → claim → figure/table/paper
 
 `hybrid` 和 `other` 不能由单一标签决定检查面，必须用非空 `validation_facets` 选择上述一个或多个模型族；审计器对所选 facet 的必需检查取并集。其他模型族省略该字段时等价于只选择自身模型族。G2 人工 review 仍须核对这些结构化检查是否覆盖真实失败方式。
 
+从 `2.4.0` 起，任何带 `numeric_assertions` 的 final claim 只要直接引用一个模型，或引用由该模型实验产生的 result，该模型的 `formulation.equations`、`objectives`、`constraints` 三者至少有一项非空；空骨架不能支撑定量论文结论。审计器在 G2 报告模型 ID 和相关 claim ID，但不会要求纯描述或纯统计模型虚构决策变量。
+
+模型族还要与已经登记的证据一致。若某个绑定实验包含 `direction: minimize/maximize` 的 metric，或绑定 result 的 diagnostic 出现成对 `objective_incumbent/objective_bound`、`objective_reconciliation`，则 `effective_validation_facets` 必须包含 `optimization`。实验信号在 G3 检查，结果信号在 G4 检查；预先声明更严格的 `optimization` facet 而尚未产生这些信号是合法的，不作反向推断。
+
 优化模型的启发式结果默认只能支持“当前找到的最好解”。若要使用“全局最优”，必须提供严格证明、可核验证书或有效的上下界，并经过人工复核。
 
 `objective_reconciliation` 与 `solver_optimality` 正交：前者固定已经输出的主决策变量，再用独立代码重新优化其余辅助变量，检查当前实现是否遗漏了可改善的最优响应；后者只描述求解器对其所接收模型的求解质量。对账 diagnostic 必须声明非空且不相交的主决策/辅助变量标识，绑定实验中独立于主入口的代码文件及 SHA-256，记录求解方法、目标 metric、原目标、最优响应目标、方向化 `repair_gain` 和预登记容差。审计器只能强制这些结构并重算差值，不能证明独立脚本确实实现了正确的重新优化。

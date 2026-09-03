@@ -138,6 +138,9 @@ def build_hybrid_union_release(root: Path | None = None) -> Path:
     model["validation_facets"] = facets
     append_missing_checks(model, required)
     write_yaml(root, "specs/model_spec.yaml", model)
+    experiment = load_yaml(root / "experiments/experiment.yaml")
+    experiment["metrics"][0]["direction"] = "maximize"
+    write_yaml(root, "experiments/experiment.yaml", experiment)
     add_solver_result_evidence(root)
     resign_release_project(root)
     return root
