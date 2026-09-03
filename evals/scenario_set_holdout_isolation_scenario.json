@@ -1,0 +1,8 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E19-scenario-set-holdout-isolation",
+  "fixture_profile": "e19-scenario-set-holdout-isolation",
+  "missing_role_code": "SCENARIO_SET_ROLE_COVERAGE_MISSING",
+  "hash_overlap_code": "SCENARIO_SET_HASH_OVERLAP",
+  "selection_claim_code": "FINAL_CLAIM_SELECTION_SCENARIO_METRIC"
+}

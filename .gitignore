@@ -1,4 +1,4 @@
-# Python bytecode and test/tool caches.
+# Repository-local Python bytecode and test/tool caches.
 __pycache__/
 *.py[cod]
 .pytest_cache/

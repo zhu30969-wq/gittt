@@ -11,10 +11,15 @@ python -m pip install -r scripts/requirements.txt
 初始化新项目：
 
 ```bash
-python scripts/init_project.py ./work --project-id project:cumcm-2026-a
+python scripts/init_project.py ./work \
+  --project-id project:cumcm-2026-a \
+  --contest-year 2026 --problem-code A \
+  --default-seed 42 --paper-engine latex
 ```
 
-初始化器只创建缺失文件。目标文件已存在时返回 `NOT_APPLICABLE`，不会覆盖、合并或刷新其内容。模板中的题面、代码、环境和结果是明确的占位内容，填写并重新锁定 manifest 前，审计出现 `BLOCK` 或 `STALE` 是预期行为。
+新项目必须显式提供 `--contest-year`，初始化器不会从当前日期或项目 ID 猜测年份。`--problem-code`、`--default-seed` 和 `--paper-engine` 分别默认使用 `UNSET`、`42` 和 `latex`，并记录在 `manifest.extensions.initialization`；种子不再与年份绑定。初始化器只创建缺失文件。完整目标无参数重复调用时，顶层 `status` 返回 `PASS`、退出码为 `0`，每个已存在文件的 finding 为 `NOT_APPLICABLE`，且不会覆盖、合并或刷新任何已有文件。初始化相关的五类拒绝都发生在写入之前且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数没有现有记录且没有缺失模板会真实消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源不一致时返回 `EXISTING_INITIALIZATION_INVALID`。旧项目若缺少模板文件且没有保存所需初始化值，应显式补充参数；只有真实包含相应占位符的缺失文件才会消费该参数。当前模板生成 `2.4.0` 契约；合法 `2.x.x`（包括 `2.0.0`、`2.0.1`、`2.1.0`、`2.2.0` 与 `2.3.x`）仍可读取、重复初始化和审计，no-op 不自动迁移或改写旧版本，`1.x` 仍不受支持。旧 `2.0.1` experiment 缺少 `decision_timing` 时不会在 Schema 层中断读取，而由审计器返回明确的 `DECISION_TIMING_REQUIRED` finding；`2.2.0` 新增 optimization 的 `objective_reconciliation` 强制考虑项，旧 `2.1.x` 优化项目缺失它时仍可读取，并由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding；`2.3.0` 新增显式 `scenario_sets`、metric 的 `scenario_set_ref` 与 optimization 的 `holdout_leakage` 覆盖要求，旧 `2.2.x` 项目缺项时仍可读取，审计器分别给出 `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED` 和 `SCENARIO_HOLDOUT_CHECK_REQUIRED`；`2.4.0` 新增 final 定量 claim 的非空 formulation 与 optimization 证据/facet 一致性检查，旧 `2.3.x` 命中条件时分别返回 `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` 和 `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`。这些旧文件都不会在 Schema 层崩溃；缺项必须依据真实语义显式补齐，工具不会猜测或自动写回。
+
+模板中的题面、代码、环境和结果是明确占位内容。未执行的普通 partial 结果可用 `started_at: null` 与 `finished_at: null`，不伪造运行时间；success、failed 和实际 promotion-trigger partial 必须记录真实且有序的时间区间。填写并重新锁定 manifest 前，审计出现 `BLOCK` 或 `STALE` 是预期行为。
 
 查看 manifest 与当前文件的差异，或在明确确认后刷新其顶层 artifact 哈希：
 
@@ -50,12 +55,16 @@ lint 检查占位符、跨引擎语法污染、危险 LaTeX shell escape、缺�
 
 ```bash
 python scripts/record_gate_review.py ./work \
-  --gate G2 --decision PASS --reviewer "reviewer-name" \
+  --gate G2 --decision PASS \
+  --approval-set-id approval:g2-r1 \
+  --member-id member:modeler --reviewer "reviewer-name" \
   --rationale "已逐项核对符号、模型假设、推导和适用范围" \
   --evidence model:main --fingerprint model:main=<sha256>
 ```
 
 该脚本执行显式的追加操作，保留原有 review，采用临时文件完成原子替换，并检查可选的期望文件哈希以避免并发覆盖。
+
+`--reviewer` 只与 `team_members[].display_name` 做字符串对照；`--member-id` 和角色也只核对 review 契约中的声明。该脚本不提供密码学身份认证，只记录可追责、可复核且绑定证据指纹的签核信息。Agent 不得自行把未经人类明确确认的 review 写成 `PASS`。最终防线仍是人类读取 `reviews`、对应证据和签核上下文，确认记录确实代表签核者本人判断。
 
 ## 门禁定义
 
@@ -114,6 +123,24 @@ BLOCK > ENV_BLOCK > STALE > WARN > PASS > NOT_APPLICABLE
 
 定性诊断的 PASS 仍依赖证据文件和人工复核；只有带结构化阈值的诊断由审计器重算数值判断。LaTeX/Typst 公式不能安全自动解析时，不得把符号闭包检查写成“数学已验证”。
 
+以下检查直接阻断不完整或不可比的验证证据：
+
+- `VALIDATION_FACETS_REQUIRED`：`model_family` 为 `hybrid` 或 `other`，但没有声明至少一项合法 `validation_facets`。
+- `EMPTY_FORMULATION_SUPPORTS_CLAIM`：`2.4.0` 项目中的 final 定量 claim 直接或经 result 使用了三类 formulation 列表均为空的模型；G2 会同时列出 model 与 claim ID。
+- `FAMILY_EVIDENCE_MISMATCH`：experiment 的 minimize/maximize metric，或 result 中的求解器目标界/目标对账证据，要求有效验证 facets 包含 `optimization`；仅有 experiment 信号在 G3 阻断，result 信号在 G4 阻断。
+- `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` / `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`：旧 `2.3.x` 契约仍可读取，但命中 `2.4.0` 新增的一致性条件时以明确迁移 finding 阻断，不在 Schema 层崩溃。
+- `OBJECTIVE_RECONCILIATION_REQUIRED`：`2.2.0` 以前的 optimization 契约没有登记新引入的固定主决策—辅助变量最优响应检查；旧文件仍可读取，但补齐前保持 G2 `BLOCK`。
+- `SOLVER_OPTIMALITY_NOT_BLOCKING`：模型的有效验证 facet 包含 `optimization`，但没有 `applicability: required`、`criticality: blocking` 且带数值 `threshold` 的 `solver_optimality` 检查。
+- `OBJECTIVE_RECONCILIATION_INCOMPLETE` / `OBJECTIVE_RECONCILIATION_SCOPE_INVALID` / `OBJECTIVE_RECONCILIATION_NOT_INDEPENDENT`：最优响应对账缺字段、主/辅助变量集合为空或相交、变量不属于模型，或重用了实验主入口。
+- `OBJECTIVE_RECONCILIATION_MISMATCH`：登记的求解器目标没有绑定结果 metric，或 `repair_gain` 不等于审计器按目标方向重算的差值。
+- `OBJECTIVE_REPAIR_GAIN_EXCEEDED`：固定主决策后重新优化辅助变量所得目标变化超过预登记的绝对/相对容差，相关 result 不能成为 eligible 证据。
+- `SCENARIO_HOLDOUT_CHECK_REQUIRED` / `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED`：旧 `2.2.x` 项目缺少随机情景优化的显式验证检查或 experiment 情景集字段；旧文件仍可读取，但必须按实际语义迁移后才能解除阻断。
+- `SCENARIO_SETS_REQUIRED` / `SCENARIO_SET_ROLE_COVERAGE_MISSING` / `SCENARIO_SET_HASH_OVERLAP`：需要情景留出验证的 optimization experiment 未登记两种角色，或 selection 与 holdout 复用了相同情景字节。
+- `FINAL_CLAIM_METRIC_SCENARIO_UNBOUND` / `FINAL_CLAIM_SELECTION_SCENARIO_METRIC`：随机情景优化的 final claim 指标未绑定本实验情景集，或仍来自 selection 而非 holdout。
+- `RANKING_WITHIN_SOLVER_GAP`：claim 声称候选存在排名或优于关系，但相应 result 记录的 `objective_incumbent`—`objective_bound` 求解质量区间重叠。
+- `DECISION_TIMING_REQUIRED`：experiment 缺少显式 `decision_timing`；旧 `2.0.x` 契约仍会进入完整审计，但不得由工具猜测默认值，补齐真实时序前保持 G3 `BLOCK`。
+- `DECISION_TIMING_MISMATCH`：跨 result 的差值、排名或优于基线判断引用了 `decision_timing` 不一致的 experiment。
+
 ## 推荐自测
 
 至少保留以下正反向案例：
@@ -136,6 +163,6 @@ BLOCK > ENV_BLOCK > STALE > WARN > PASS > NOT_APPLICABLE
 16. 支持 release 证据的实验遗漏任一辅助 `code_files` deliverable 时 `BLOCK`。
 17. LaTeX/Typst 构建日志含明确 compiler failure 时不得出现 `PAPER_BUILD_RECEIPT_VERIFIED`。
 18. 纯证明 release 使用单词、未绑定 claim ID/命题的文本，或 `formally_proved` 回执未绑定证明 SHA-256 时 `BLOCK`。
-17. JSON/YAML 出现重复键、NaN、Infinity 或递归别名，旧版 1.x 模板/manifest 试图被刷新，或 release 改用非 bundled Schema 根目录时 `BLOCK` 且不得修改目标文件。
+19. JSON/YAML 出现重复键、NaN、Infinity 或递归别名，旧版 1.x 模板/manifest 试图被刷新，或 release 改用非 bundled Schema 根目录时 `BLOCK` 且不得修改目标文件。
 
 独立前向测试应让未参与设计的 agent 只看到 skill、真实请求和原始材料；评价实际 artifact 和门禁行为，不匹配固定措辞，也不提前泄露陷阱。

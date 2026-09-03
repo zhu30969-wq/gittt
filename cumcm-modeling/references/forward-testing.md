@@ -12,13 +12,52 @@
 6. 至少保留一组从未用于调试的 held-out 场景；
 7. 测试不得自动删除成批文件，临时目录留存并报告位置。
 
-仓库提供一个可执行的离线恢复场景：
+仓库提供五个可执行的离线场景。E01 从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
+
+```bash
+python -X utf8 evals/run_complete_chain.py <new-target-path>
+```
+
+目标路径必须尚不存在。该 harness 保留初始化、完整、负向和恢复四份审计报告，以及负向 `results.yaml` 快照。正向链必须达到 `PASS / SUBMISSION_READY`，每个问题到达 final claim，定量 claim 绑定 eligible result，两份输出在预登记容差内重现，图表进入 paper 证据链。负向链保持 `solver_optimality` 通过，却因固定主决策后的独立最优响应超容差而触发 `OBJECTIVE_REPAIR_GAIN_EXCEEDED` 并令结果失去 eligibility；恢复原始结果字节后必须重新通过。
+
+E17 验证离线中断恢复：
 
 ```bash
 python -X utf8 evals/run_held_out_resume.py <new-target-path>
 ```
 
 目标路径必须尚不存在。该 harness 初始化最小项目、加入中断恢复标记、再次调用初始化器并核对所有文件字节未被覆盖，随后用两个独立报告验证 `workflow_state`、`last_valid_gate`、`rollback_target` 和 `next_legal_action` 的确定性。项目和报告全部保留，脚本不删除文件。
+
+E18 验证混合模型的验证覆盖并集：
+
+```bash
+python -X utf8 evals/run_hybrid_validation_facet_union.py <new-target-path>
+```
+
+该 harness 分别保留缺失 facets、缺失并集、完整并集和 optimization 逃逸尝试四个合成项目。`hybrid` 缺少 `validation_facets` 时必须阻断；声明 `optimization` 与 `simulation` 后，缺失 finding 必须精确列出两族检查并集，完整登记必须通过；`optimization` 模型额外声明 `simulation` 也不能隐藏自身族级检查。
+
+E19 验证随机优化的 selection/holdout 隔离：
+
+```bash
+python -X utf8 evals/run_scenario_set_holdout_isolation.py <new-target-path>
+```
+
+该 harness 保留一个正向项目和缺角色、哈希重叠、final claim 使用 selection 指标三个负向项目。正向项目必须同时登记两个角色且情景字节不重叠；三类负向状态分别触发稳定 finding code。
+
+E20 验证比较实验的决策时序一致性：
+
+```bash
+python -X utf8 evals/run_decision_timing_comparability.py <new-target-path>
+```
+
+该 harness 使用同一合成双候选比较，先让两个 experiment 分别采用 `here_and_now` 与 `wait_and_see` 并确认阻断，再把两者统一为 `here_and_now` 并确认恢复通过。
+
+`evals/scenarios.yaml` 使用明确的执行状态：
+
+- `executable`：仓库中存在真实 fixture 和可运行 harness，可报告本次实际运行结果；
+- `specification_only`：只定义待观察行为，不能声称已经完成独立 Agent 端到端评测。
+
+当前 E01、E17、E18、E19 与 E20 具备独立可执行 harness。E02–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
 
 ## P0 行为场景
 
@@ -51,3 +90,14 @@ python -X utf8 evals/run_held_out_resume.py <new-target-path>
 ## 迭代停止条件
 
 同一确定性脚本错误最多自动尝试修复两轮。若重复失败、需要改变科学假设、需要降低阈值或需要扩大容差，停止自动修复并报告根因。Skill 的改动必须由实际失败支持，不能为单个例子累积成普遍硬规则。
+
+## 待建设的可执行场景
+
+后续至少需要为以下行为补齐独立材料、fixture、harness 和结果判定，完成前保持 `specification_only`：
+
+- 时序预测泄漏与时间顺序验证；
+- 启发式优化约束回代与最优性措辞；
+- 综合评价中的权重扰动和排名翻转；
+- 数据、结果模板、说明与参考资料混合目录的输入角色识别。
+
+不得为了填满场景而生成虚构的优秀论文或伪造独立 Agent 结果。

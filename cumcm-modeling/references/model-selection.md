@@ -62,6 +62,53 @@
 
 ## 条件性判断
 
+下表是审计器的强制口径；Agent 应在 G2 之前依据已经确定的 `model_family` 与 `task_type` 填写 `validation_plan.checks`，不适用的检查也要显式标为 `not_applicable` 并写明理由，不要等审计出现 `BLOCK` 后再补。
+
+`validation_facets` 用于声明一个模型实际跨越的验证维度，取值只能来自下表七个有族级映射的模型族。`model_family` 为 `hybrid` 或 `other` 时必须至少填写一项，审计器对所有 facet 的必需检查取并集；其余模型族可省略该字段，省略时等价于只选择自身模型族。
+
+<!-- BEGIN GENERATED: validation-matrix -->
+### 审计器验证覆盖决策表
+
+> 本块由 `scripts/export_validation_matrix.py` 生成；映射取自审计器常量，合法取值与行顺序取自 Schema。不要手工编辑。
+
+#### 模型族 → 必须考虑的 checks
+
+| `model_family` | `validation_plan.checks` 必须考虑 |
+|---|---|
+| `descriptive` | `input_integrity` |
+| `statistical` | `uncertainty`、`residual_diagnostics` |
+| `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
+| `optimization` | `baseline_comparison`、`holdout_leakage`、`constraint_feasibility`、`solver_optimality`、`objective_reconciliation`、`sensitivity` |
+| `simulation` | `convergence`、`conservation_balance`、`numerical_stability`、`boundary_case` |
+| `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
+| `causal` | `uncertainty`、`identifiability`、`falsification` |
+| `hybrid` | 由必填的 `validation_facets` 所选模型族检查取并集（仍叠加任务级与公式级约束） |
+| `other` | 由必填的 `validation_facets` 所选模型族检查取并集（仍叠加任务级与公式级约束） |
+
+#### 任务类型 → 必须考虑的 checks
+
+| `task_type` | `validation_plan.checks` 必须考虑 |
+|---|---|
+| `description` | `input_integrity` |
+| `prediction` | `baseline_comparison`、`holdout_leakage`、`predictive_error`、`uncertainty` |
+| `evaluation` | `baseline_comparison`、`sensitivity`、`rank_stability` |
+| `optimization` | `baseline_comparison`、`constraint_feasibility`、`solver_optimality`、`sensitivity` |
+| `mechanism` | `dimensional_consistency`、`sensitivity`、`boundary_case` |
+| `decision` | `baseline_comparison`、`sensitivity` |
+| `other` | —（无任务级强制检查；仍可能受族级与公式级约束） |
+
+当 `formulation.equations`、`objectives` 或 `constraints` 中任一列表非空时，审计器还会叠加公式级检查：`dimensional_consistency`、`domain_validity`、`formula_back_substitution`。
+
+#### 当前覆盖边界与盲区
+
+- **无族级映射的 `model_family`**：`hybrid`、`other`。这些取值必须声明非空 `validation_facets`，审计器按所选模型族的检查取并集；因此它们不再构成有效输入的族级覆盖盲区。
+- **无族级映射的 `validation_facets`**：（无）。合法 facet 与族级映射键保持一致；该差集非空时生成器会拒绝输出。
+- **无任务级映射的 `task_type`**：`other`。该任务类型不受任务级 check 覆盖约束，仍可能受模型族与公式级约束。
+- **未被族、任务或公式规则自动要求的 `validationCheckType`**：`seed_stability`、`reproducibility`、`other`。其中 `seed_stability` 对随机算法是关键检查，目前完全依赖人工在 `validation_plan.checks` 中主动声明；`reproducibility` 与 `other` 同样不会被自动补入。
+<!-- END GENERATED: validation-matrix -->
+
+除题型映射外，审计器还核对声明与实际证据。从 `2.4.0` 起，final 定量 claim 直接或经 result 使用的模型不得让 `equations`、`objectives`、`constraints` 同时为空；实验 metric 的 `direction` 为 `minimize`/`maximize`，或结果诊断登记成对求解器目标界、`objective_reconciliation` 时，有效验证 facets 必须包含 `optimization`。这些信号只把宽松声明提升到证据实际需要的检查面；已主动声明 `optimization` 但尚无上述信号不会被反向判错。
+
 条件性判断必须转成 `validation_plan.checks`，不能只留在论文写作清单里。每项检查预先声明适用性、阻断性、过程、通过规则、可选数值阈值和失败响应；运行后由 `results.diagnostics` 一对一报告。`not_applicable` 表示团队明确判断该检查不适用，不等于忘记填写。
 
 ### 预测与推断
@@ -87,6 +134,8 @@
 - 求解规模和剩余时间是否允许精确算法。
 
 启发式算法不是“非线性”的默认答案。使用启发式时必须报告可行性、基线差距、重复运行波动，且不得无证据宣称全局最优。
+
+除求解器 gap/上下界外，还要做独立的目标对账：固定最终主决策，用单独脚本重新优化辅助变量并比较目标值。对同一组辅助变量简单重新求和不属于 `objective_reconciliation`，因为它无法发现“可行但辅助响应未达最优”的实现遗漏。
 
 ### 评价与排序
 

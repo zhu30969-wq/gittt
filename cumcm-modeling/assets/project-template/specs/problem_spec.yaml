@@ -1,4 +1,4 @@
-schema_version: 2.0.0
+schema_version: 2.4.0
 kind: problem_spec
 id: problem:main
 revision: 1
@@ -9,8 +9,8 @@ provenance:
 extensions: {}
 contest:
   name: 全国大学生数学建模竞赛
-  year: 2026
-  problem_code: UNSET
+  year: __CONTEST_YEAR__
+  problem_code: __PROBLEM_CODE__
 statement:
   path: inputs/problem-statement.pdf
   sha256: "0000000000000000000000000000000000000000000000000000000000000000"

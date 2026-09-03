@@ -1,4 +1,4 @@
-schema_version: 2.0.0
+schema_version: 2.4.0
 kind: manifest
 id: manifest:project
 revision: 1
@@ -6,7 +6,12 @@ lifecycle_status: draft
 depends_on: []
 provenance:
   author_type: human
-extensions: {}
+extensions:
+  initialization:
+    contest_year: __CONTEST_YEAR__
+    problem_code: __PROBLEM_CODE__
+    default_seed: __DEFAULT_SEED__
+    paper_engine: __PAPER_ENGINE__
 manifest_type: project
 project_id: __PROJECT_ID__
 competition_profile:

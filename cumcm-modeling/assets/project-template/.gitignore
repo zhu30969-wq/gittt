@@ -1,4 +1,4 @@
-# Persistent sidecar files coordinate concurrent manifest/review writers.
+# Generated-project sidecar files coordinate concurrent manifest/review writers.
 .*.lock
 
 # Local caches and secrets are not project evidence.

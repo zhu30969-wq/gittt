@@ -28,7 +28,13 @@ SCHEMA_ROOT = REPO_ROOT / "cumcm-modeling" / "references" / "schemas"
 sys.path.insert(0, str(SCRIPT_ROOT))
 
 from _contract_support import dump_yaml, load_yaml, sha256_file  # noqa: E402
-from audit_project import Audit, VALIDATION_COVERAGE_BY_FAMILY, main, parse_rfc3339  # noqa: E402
+from audit_project import (  # noqa: E402
+    Audit,
+    FORMULA_VALIDATION_CHECKS,
+    VALIDATION_COVERAGE_BY_FAMILY,
+    main,
+    parse_rfc3339,
+)
 
 
 CREATED_ROOTS: list[Path] = []
@@ -75,7 +81,7 @@ def minimal_text_pdf(text: str) -> str:
 
 def artifact_base(kind: str, artifact_id: str, dependencies: list[str], author: str = "human") -> dict[str, Any]:
     return {
-        "schema_version": "2.0.0",
+        "schema_version": "2.4.0",
         "kind": kind,
         "id": artifact_id,
         "revision": 1,
@@ -86,8 +92,31 @@ def artifact_base(kind: str, artifact_id: str, dependencies: list[str], author: 
     }
 
 
-def build_release_project() -> Path:
-    root = Path(tempfile.mkdtemp(prefix="cumcm-audit-regression-"))
+def not_applicable_formula_check(check_type: str, *, id_prefix: str = "check:") -> dict[str, Any]:
+    """Declare a formula check explicitly outside the synthetic fixture's scope."""
+
+    return {
+        "id": f"{id_prefix}{check_type.replace('_', '-')}",
+        "check_type": check_type,
+        "applicability": "not_applicable",
+        "activation_condition": None,
+        "criticality": "advisory",
+        "rationale": "The constant synthetic identity is only a contract fixture, not a mathematical derivation under test.",
+        "procedure": "No procedure is run for this deliberately inapplicable synthetic check.",
+        "pass_rule": "The formula check remains explicitly registered as not applicable.",
+        "threshold": None,
+        "failure_response": "report_only",
+    }
+
+
+def build_release_project(root: Path | None = None) -> Path:
+    if root is None:
+        root = Path(tempfile.mkdtemp(prefix="cumcm-audit-regression-"))
+    else:
+        root = root.resolve()
+        if root.exists():
+            raise FileExistsError(f"synthetic release target must be new: {root}")
+        root.mkdir(parents=True)
     CREATED_ROOTS.append(root)
     write_text(root, "inputs/problem.txt", "Synthetic modeling problem.\n")
     write_text(root, "code/main.py", "print('ok')\n")
@@ -170,7 +199,21 @@ def build_release_project() -> Path:
                     "definition": "Synthetic score.",
                 }
             ],
-            "formulation": {"equations": [], "objectives": [], "constraints": []},
+            "formulation": {
+                "equations": [
+                    {
+                        "id": "formula:identity",
+                        "expression": "x = 0.95",
+                        "format": "plain",
+                        "defines": [],
+                        "uses": ["symbol:x"],
+                        "source_constraint_refs": [],
+                        "interpretation": "Bind the synthetic output used by the final numeric claim.",
+                    }
+                ],
+                "objectives": [],
+                "constraints": [],
+            },
             "data_bindings": [],
             "algorithm": {
                 "description": "Emit deterministic fixture output.",
@@ -202,6 +245,10 @@ def build_release_project() -> Path:
             "fallback_rules": [],
         }
     )
+    model["validation_plan"]["checks"].extend(
+        not_applicable_formula_check(check_type)
+        for check_type in sorted(FORMULA_VALIDATION_CHECKS)
+    )
     write_yaml(root, "specs/model_spec.yaml", model)
 
     experiment = artifact_base("experiment", "experiment:main", ["model:main"])
@@ -210,6 +257,7 @@ def build_release_project() -> Path:
             "model_ref": "model:main",
             "question_refs": ["question:q1"],
             "mode": "validation",
+            "decision_timing": "here_and_now",
             "purpose": "Validate the synthetic score.",
             "hypothesis": "Score is at least 0.9.",
             "data_refs": [],
@@ -225,15 +273,17 @@ def build_release_project() -> Path:
             "repetitions": 1,
             "parameters": {},
             "split_strategy": "Not applicable to deterministic fixture.",
+            "scenario_sets": [],
             "baseline_refs": [],
             "baseline_comparison_rules": [],
             "metrics": [
                 {
                     "id": "metric:score",
                     "name": "score",
-                    "direction": "maximize",
+                    "direction": "descriptive",
                     "unit": "1",
                     "aggregation": "single run",
+                    "scenario_set_ref": None,
                     "source_output_ref": "output:primary",
                     "extractor": {"type": "json_pointer", "pointer": "/score"},
                 }
@@ -783,6 +833,18 @@ def build_promoted_release_project(
         ],
         "human_review_required": True,
     }
+    fallback["formulation"]["equations"][0].update(
+        id="formula:fallback-identity",
+        expression="y = 0.95",
+        uses=["symbol:fallback-score"],
+        interpretation="Bind the synthetic fallback output used by the final numeric claim.",
+    )
+    fallback["validation_plan"]["checks"].extend(
+        not_applicable_formula_check(
+            check_type, id_prefix="check:fallback-"
+        )
+        for check_type in sorted(FORMULA_VALIDATION_CHECKS)
+    )
     write_yaml(root, "specs/model-fallback.yaml", fallback)
 
     primary_experiment = load_yaml(root / "experiments/experiment.yaml")
@@ -873,7 +935,7 @@ def build_promoted_release_project(
                 {
                     "id": "metric:fallback-score",
                     "name": "fallback score",
-                    "direction": "maximize",
+                    "direction": "descriptive",
                     "unit": "1",
                     "aggregation": "single run",
                     "source_output_ref": "output:fallback",
@@ -1412,11 +1474,19 @@ def build_promotion_release_project() -> Path:
     fallback["method_selection"]["decision"] = "conditional"
     fallback["method_selection"]["rationale"] = "Predeclared fallback route for the synthetic fixture."
     fallback["symbols"][0].update(id="symbol:fallback-score", name="fallback_score")
+    fallback["formulation"]["equations"][0].update(
+        id="formula:fallback-identity",
+        expression="fallback_score = 0.95",
+        uses=["symbol:fallback-score"],
+        interpretation="Bind the synthetic fallback output used by the final numeric claim.",
+    )
     fallback["validation_plan"]["checks"][0].update(
         id="check:fallback-integrity",
         pass_rule="Fallback score equals 0.95.",
         threshold={"operator": "==", "value": 0.95, "unit": "1"},
     )
+    for check in fallback["validation_plan"]["checks"][1:]:
+        check["id"] = f"check:fallback-{check['check_type'].replace('_', '-')}"
     fallback["fallback_models"] = []
     fallback["fallback_rules"] = []
     write_yaml(root, "specs/model-fallback.yaml", fallback)

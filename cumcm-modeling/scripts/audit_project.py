@@ -84,6 +84,7 @@ GATES = tuple(f"G{number}" for number in range(8))
 ZERO_HASH = "0" * 64
 HARD_STATUSES = {"BLOCK", "ENV_BLOCK", "STALE"}
 TEAM_ROLES = {"modeling", "computation", "writing"}
+DECISION_TIMING_VALUES = {"here_and_now", "wait_and_see", "recourse"}
 RELEASE_GATE_REQUIRED_ROLES: dict[str, set[str]] = {
     "G0": set(),
     "G1": set(TEAM_ROLES),
@@ -112,7 +113,14 @@ VALIDATION_COVERAGE_BY_FAMILY: dict[str, set[str]] = {
     "descriptive": {"input_integrity"},
     "statistical": {"residual_diagnostics", "uncertainty"},
     "prediction": {"baseline_comparison", "holdout_leakage", "predictive_error", "uncertainty"},
-    "optimization": {"constraint_feasibility", "solver_optimality", "baseline_comparison", "sensitivity"},
+    "optimization": {
+        "constraint_feasibility",
+        "solver_optimality",
+        "objective_reconciliation",
+        "baseline_comparison",
+        "holdout_leakage",
+        "sensitivity",
+    },
     "simulation": {"boundary_case", "convergence", "conservation_balance", "numerical_stability"},
     "evaluation": {"baseline_comparison", "sensitivity", "rank_stability"},
     "causal": {"identifiability", "falsification", "uncertainty"},
@@ -126,6 +134,9 @@ VALIDATION_COVERAGE_BY_TASK: dict[str, set[str]] = {
     "decision": {"baseline_comparison", "sensitivity"},
 }
 FORMULA_VALIDATION_CHECKS = {"dimensional_consistency", "domain_validity", "formula_back_substitution"}
+OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION = (2, 2, 0)
+SCENARIO_SETS_INTRODUCED_VERSION = (2, 3, 0)
+MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION = (2, 4, 0)
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 PAPER_COMPILERS_BY_ENGINE = {
     "latex": {"latexmk", "xelatex", "lualatex", "pdflatex", "tectonic"},
@@ -181,6 +192,36 @@ NUMERIC_OPERATIONS = {
 }
 
 
+def effective_validation_facets(model: dict[str, Any]) -> set[str]:
+    """Return additive family facets without allowing a mapped family to be dropped."""
+
+    declared = model.get("validation_facets", [])
+    facets = (
+        {
+            facet
+            for facet in declared
+            if isinstance(facet, str) and facet in VALIDATION_COVERAGE_BY_FAMILY
+        }
+        if isinstance(declared, list)
+        else set()
+    )
+    model_family = model.get("model_family")
+    if model_family in VALIDATION_COVERAGE_BY_FAMILY:
+        facets.add(str(model_family))
+    return facets
+
+
+def scenario_holdout_is_actionable(model: dict[str, Any]) -> bool:
+    """Return whether the model predeclares a scenario holdout check to run."""
+
+    return any(
+        check.get("check_type") == "holdout_leakage"
+        and check.get("applicability") in {"required", "conditional"}
+        for check in model.get("validation_plan", {}).get("checks", [])
+        if isinstance(check, dict)
+    )
+
+
 def metric_signature(metric: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
     """Return the declared comparison semantics of one experiment metric."""
 
@@ -206,6 +247,25 @@ def decimal_number(value: Any) -> Decimal:
     return converted
 
 
+def contract_version_tuple(document: dict[str, Any]) -> tuple[int, int, int]:
+    """Return a schema-validated 2.x contract version for compatibility gates."""
+
+    match = re.fullmatch(
+        r"(\d+)\.(\d+)\.(\d+)", str(document.get("schema_version", ""))
+    )
+    if match is None:
+        return (0, 0, 0)
+    return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
+
+
+def model_evidence_consistency_code(model: dict[str, Any], current_code: str) -> str:
+    """Keep pre-2.4 contracts readable while naming their required migration."""
+
+    if contract_version_tuple(model) < MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION:
+        return f"{current_code}_MIGRATION_REQUIRED"
+    return current_code
+
+
 def experiments_are_comparable(primary: dict[str, Any], baseline: dict[str, Any]) -> bool:
     """Require one fair experimental frame and all decision metrics.
 
@@ -220,6 +280,8 @@ def experiments_are_comparable(primary: dict[str, Any], baseline: dict[str, Any]
         set(primary.get("question_refs", [])) == set(baseline.get("question_refs", []))
         and set(primary.get("data_refs", [])) == set(baseline.get("data_refs", []))
         and primary.get("split_strategy") == baseline.get("split_strategy")
+        and primary.get("decision_timing") in DECISION_TIMING_VALUES
+        and primary.get("decision_timing") == baseline.get("decision_timing")
         and primary.get("seeds") == baseline.get("seeds")
         and primary.get("repetitions") == baseline.get("repetitions")
         and primary.get("timeout_seconds") == baseline.get("timeout_seconds")
@@ -1039,6 +1101,51 @@ class Audit:
                 "BLOCK",
                 "SCHEMA_INVALID",
                 f"{location}: {error.message}",
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        validation_facets = document.get("validation_facets")
+        if kind == "model_spec" and document.get("model_family") in {"hybrid", "other"} and (
+            "validation_facets" not in document
+            or isinstance(validation_facets, list) and not validation_facets
+        ):
+            self.add(
+                "G2",
+                "BLOCK",
+                "VALIDATION_FACETS_REQUIRED",
+                f"{document.get('id')} model_family={document.get('model_family')!r} requires at least one validation facet",
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        if kind == "experiment" and "decision_timing" not in document:
+            self.add(
+                "G3",
+                "BLOCK",
+                "DECISION_TIMING_REQUIRED",
+                (
+                    f"{document.get('id')} schema_version={document.get('schema_version')!r} omits "
+                    "decision_timing; explicitly declare here_and_now, wait_and_see, or recourse; "
+                    "the auditor does not infer a default"
+                ),
+                path=relative,
+                artifact_id=document.get("id"),
+            )
+        if (
+            kind == "experiment"
+            and "scenario_sets" not in document
+            and (2, 0, 0)
+            <= contract_version_tuple(document)
+            < SCENARIO_SETS_INTRODUCED_VERSION
+        ):
+            self.add(
+                "G3",
+                "BLOCK",
+                "SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED",
+                (
+                    f"{document.get('id')} schema_version={document.get('schema_version')!r} predates "
+                    "the scenario_sets contract; add an explicit empty list for non-scenario work or "
+                    "register disjoint selection/holdout sets for scenario-based experiments"
+                ),
                 path=relative,
                 artifact_id=document.get("id"),
             )
@@ -1865,6 +1972,30 @@ class Audit:
         models_by_id = {document.get("id"): document for document in models}
         experiments_by_id = {document.get("id"): document for document in experiments}
         results_by_id = {document.get("id"): document for document in results}
+        quantitative_final_claims_by_model: dict[str, set[str]] = defaultdict(set)
+        for registry in claims_docs:
+            for claim in registry.get("claims", []):
+                claim_id = claim.get("id")
+                if (
+                    claim.get("publication_status") != "final"
+                    or not claim.get("numeric_assertions")
+                    or not isinstance(claim_id, str)
+                ):
+                    continue
+                for evidence in claim.get("evidence_refs", []):
+                    if not isinstance(evidence, dict):
+                        continue
+                    evidence_ref = evidence.get("ref")
+                    if evidence_ref in models_by_id:
+                        quantitative_final_claims_by_model[str(evidence_ref)].add(claim_id)
+                        continue
+                    result = results_by_id.get(evidence_ref)
+                    if not isinstance(result, dict):
+                        continue
+                    experiment = experiments_by_id.get(result.get("experiment_ref"))
+                    model_ref = experiment.get("model_ref") if isinstance(experiment, dict) else None
+                    if model_ref in models_by_id:
+                        quantitative_final_claims_by_model[str(model_ref)].add(claim_id)
         self.validate_model_promotions(promotions, models_by_id, experiments_by_id, results_by_id)
         question_owner_by_id: dict[str, str] = {}
         questions_by_id: dict[str, dict[str, Any]] = {}
@@ -2184,6 +2315,31 @@ class Audit:
                         f"{model_id} lists but does not bind formulas to hard constraints {sorted(missing_formulations)}",
                         artifact_id=model_id,
                     )
+            quantitative_claim_ids = quantitative_final_claims_by_model.get(str(model_id), set())
+            formulation = model.get("formulation", {})
+            if quantitative_claim_ids and not any(
+                formulation.get(section) for section in ("equations", "objectives", "constraints")
+            ):
+                code = model_evidence_consistency_code(
+                    model, "EMPTY_FORMULATION_SUPPORTS_CLAIM"
+                )
+                migration_note = (
+                    f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                    "model/claim consistency contract and must be migrated;"
+                    if code.endswith("_MIGRATION_REQUIRED")
+                    else ""
+                )
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    code,
+                    (
+                        f"{model_id}{migration_note} equations, objectives, and constraints are all "
+                        f"empty while supporting final quantitative claims {sorted(quantitative_claim_ids)}; "
+                        "declare at least one formulation item"
+                    ),
+                    artifact_id=model_id,
+                )
             for section in ("equations", "objectives", "constraints"):
                 for formula in model.get("formulation", {}).get(section, []):
                     for symbol_ref in [*formula.get("defines", []), *formula.get("uses", [])]:
@@ -2336,7 +2492,10 @@ class Audit:
 
             checks = model.get("validation_plan", {}).get("checks", [])
             declared_check_types = {check.get("check_type") for check in checks}
-            required_check_types = set(VALIDATION_COVERAGE_BY_FAMILY.get(model.get("model_family"), set()))
+            validation_facets = effective_validation_facets(model)
+            required_check_types: set[str] = set()
+            for validation_facet in validation_facets:
+                required_check_types.update(VALIDATION_COVERAGE_BY_FAMILY[validation_facet])
             for question_ref in model_addresses:
                 required_check_types.update(
                     VALIDATION_COVERAGE_BY_TASK.get(questions_by_id.get(str(question_ref), {}).get("task_type"), set())
@@ -2344,6 +2503,45 @@ class Audit:
             if any(model.get("formulation", {}).get(section, []) for section in ("equations", "objectives", "constraints")):
                 required_check_types.update(FORMULA_VALIDATION_CHECKS)
             missing_check_types = required_check_types.difference(declared_check_types)
+            if (
+                "objective_reconciliation" in missing_check_types
+                and "optimization" in validation_facets
+                and contract_version_tuple(model) < OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION
+            ):
+                # Contracts before 2.2.0 remain schema-readable.  Surface the
+                # newly required optimization check as a precise semantic
+                # migration finding instead of hiding it in the generic
+                # coverage message or rejecting the old document at parse time.
+                missing_check_types.remove("objective_reconciliation")
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "OBJECTIVE_RECONCILIATION_REQUIRED",
+                    (
+                        f"{model_id} schema_version={model.get('schema_version')!r} has optimization "
+                        "validation scope but predates the objective_reconciliation requirement; "
+                        "declare the check and its fixed-decision best-response procedure"
+                    ),
+                    artifact_id=model_id,
+                )
+            if (
+                "holdout_leakage" in missing_check_types
+                and "optimization" in validation_facets
+                and contract_version_tuple(model) < SCENARIO_SETS_INTRODUCED_VERSION
+            ):
+                missing_check_types.remove("holdout_leakage")
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "SCENARIO_HOLDOUT_CHECK_REQUIRED",
+                    (
+                        f"{model_id} schema_version={model.get('schema_version')!r} has optimization "
+                        "validation scope but predates the scenario selection/holdout requirement; "
+                        "declare holdout_leakage as actionable for scenario-based optimization or "
+                        "not_applicable with a deterministic rationale"
+                    ),
+                    artifact_id=model_id,
+                )
             if missing_check_types:
                 self.add(
                     "G2",
@@ -2400,6 +2598,21 @@ class Audit:
                         f"{model_id}/{rule.get('trigger_check_ref')} cannot trigger fallback because it is not a blocking failure",
                         artifact_id=model_id,
                     )
+            if "optimization" in validation_facets and not any(
+                check.get("check_type") == "solver_optimality"
+                and check.get("applicability") == "required"
+                and check.get("criticality") == "blocking"
+                and isinstance(check.get("threshold"), dict)
+                and is_finite_number(check.get("threshold", {}).get("value"))
+                for check in checks
+            ):
+                self.add(
+                    "G2",
+                    "BLOCK",
+                    "SOLVER_OPTIMALITY_NOT_BLOCKING",
+                    f"{model_id} has optimization validation scope but no required blocking solver_optimality check with a numeric threshold",
+                    artifact_id=model_id,
+                )
             selected_baselines = set(model.get("method_selection", {}).get("baseline_policy", {}).get("model_refs", []))
             if selected_baselines and not any(
                 check.get("check_type") == "baseline_comparison"
@@ -2428,6 +2641,10 @@ class Audit:
             experiment_questions = set(experiment.get("question_refs", []))
             experiment_data_refs = set(experiment.get("data_refs", []))
             output_ids = [item.get("id") for item in experiment.get("outputs", [])]
+            scenario_sets = [
+                row for row in experiment.get("scenario_sets", []) if isinstance(row, dict)
+            ]
+            scenario_ids = [row.get("id") for row in scenario_sets]
             for metric in experiment.get("metrics", []):
                 matches = output_ids.count(metric.get("source_output_ref"))
                 if matches != 1:
@@ -2438,6 +2655,116 @@ class Audit:
                         f"{experiment_id}/{metric.get('id')} source_output_ref must resolve exactly once in this experiment; found {matches}",
                         artifact_id=experiment_id,
                     )
+                scenario_set_ref = metric.get("scenario_set_ref")
+                if scenario_set_ref is not None and scenario_ids.count(scenario_set_ref) != 1:
+                    self.add(
+                        "G3",
+                        "BLOCK",
+                        "METRIC_SCENARIO_SET_NOT_LOCAL",
+                        (
+                            f"{experiment_id}/{metric.get('id')} scenario_set_ref must resolve "
+                            f"exactly once in this experiment; found {scenario_ids.count(scenario_set_ref)}"
+                        ),
+                        artifact_id=experiment_id,
+                    )
+            optimization_metric_signals = [
+                f"{metric.get('id')} direction={metric.get('direction')}"
+                for metric in experiment.get("metrics", [])
+                if metric.get("direction") in {"minimize", "maximize"}
+            ]
+            if (
+                model is not None
+                and optimization_metric_signals
+                and "optimization" not in effective_validation_facets(model)
+            ):
+                code = model_evidence_consistency_code(model, "FAMILY_EVIDENCE_MISMATCH")
+                migration_note = (
+                    f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                    "family/evidence consistency contract and must be migrated;"
+                    if code.endswith("_MIGRATION_REQUIRED")
+                    else ""
+                )
+                self.add(
+                    "G3",
+                    "BLOCK",
+                    code,
+                    (
+                        f"{model.get('id')}{migration_note} experiment {experiment_id} triggers the "
+                        f"optimization-metric signal {optimization_metric_signals}; "
+                        f"model_family={model.get('model_family')!r}, "
+                        f"validation_facets={model.get('validation_facets', [])!r}; add the "
+                        "'optimization' validation facet"
+                    ),
+                    artifact_id=experiment_id,
+                )
+            optimization_scope = bool(
+                model is not None and "optimization" in effective_validation_facets(model)
+            )
+            scenario_holdout_required = bool(
+                optimization_scope
+                and model is not None
+                and scenario_holdout_is_actionable(model)
+            )
+            if optimization_scope and scenario_sets and not scenario_holdout_required:
+                self.add(
+                    "G3",
+                    "BLOCK",
+                    "SCENARIO_HOLDOUT_CHECK_INAPPLICABLE",
+                    (
+                        f"{experiment_id} registers scenario_sets but its optimization model does not "
+                        "declare holdout_leakage as required or conditional"
+                    ),
+                    artifact_id=experiment_id,
+                )
+            if scenario_holdout_required:
+                if not scenario_sets:
+                    self.add(
+                        "G3",
+                        "BLOCK",
+                        "SCENARIO_SETS_REQUIRED",
+                        (
+                            f"{experiment_id} is scenario-based optimization but does not register "
+                            "selection and holdout scenario sets"
+                        ),
+                        artifact_id=experiment_id,
+                    )
+                else:
+                    roles = {row.get("role") for row in scenario_sets}
+                    missing_roles = {"selection", "holdout"}.difference(roles)
+                    if missing_roles:
+                        self.add(
+                            "G3",
+                            "BLOCK",
+                            "SCENARIO_SET_ROLE_COVERAGE_MISSING",
+                            f"{experiment_id} lacks scenario roles {sorted(missing_roles)}",
+                            artifact_id=experiment_id,
+                        )
+                    selection_hashes = {
+                        row.get("scenario_sha256")
+                        for row in scenario_sets
+                        if row.get("role") == "selection"
+                    }
+                    holdout_hashes = {
+                        row.get("scenario_sha256")
+                        for row in scenario_sets
+                        if row.get("role") == "holdout"
+                    }
+                    overlap = sorted(
+                        value
+                        for value in selection_hashes.intersection(holdout_hashes)
+                        if isinstance(value, str)
+                    )
+                    if overlap:
+                        self.add(
+                            "G3",
+                            "BLOCK",
+                            "SCENARIO_SET_HASH_OVERLAP",
+                            (
+                                f"{experiment_id} reuses scenario_sha256 across selection and holdout: "
+                                f"{overlap}"
+                            ),
+                            artifact_id=experiment_id,
+                        )
             if experiment.get("model_ref") not in experiment.get("depends_on", []):
                 self.add(
                     "G3",
@@ -2678,11 +3005,85 @@ class Audit:
             trigger_binding = self.promotion_trigger_diagnostics.get(str(result_id))
             trigger_partial = result.get("run_status") == "partial" and trigger_binding is not None
             execution_complete = successful or trigger_partial
+            run = result.get("run", {})
+            started: datetime | None = None
+            finished: datetime | None = None
+            time_valid = True
+            started_value = run.get("started_at")
+            finished_value = run.get("finished_at")
+            requires_timestamps = result.get("run_status") in {"success", "failed"} or trigger_partial
+
+            # Placeholder partial results may use a null/null pair.  Any actual
+            # success, failure or promotion-trigger execution must bind a real
+            # interval, while a half-populated interval is invalid for every
+            # status because it cannot be interpreted deterministically.
+            try:
+                if (started_value is None) != (finished_value is None):
+                    raise ValueError("started_at and finished_at must both be null or both be timestamps")
+                if started_value is None:
+                    if requires_timestamps:
+                        raise ValueError(f"{result.get('run_status')} run requires started_at and finished_at")
+                else:
+                    started = parse_rfc3339(started_value)
+                    finished = parse_rfc3339(finished_value)
+                    if finished < started:
+                        raise ValueError("finished_at precedes started_at")
+                    if finished > datetime.now(timezone.utc) + MAX_CLOCK_SKEW:
+                        raise ValueError("finished_at is implausibly in the future")
+            except ValueError as exc:
+                self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
+                eligible = False
+                time_valid = False
+
             model = models_by_id.get(experiment.get("model_ref"))
             if model is None:
                 self.add("G4", "BLOCK", "RESULT_MODEL_MISSING", f"{result_id} experiment model does not resolve", artifact_id=result_id)
                 eligible = False
-            elif successful and (
+            else:
+                result_optimization_signals: list[str] = []
+                for diagnostic in result.get("diagnostics", []):
+                    if not isinstance(diagnostic, dict):
+                        continue
+                    diagnostic_id = diagnostic.get("id")
+                    if (
+                        "objective_incumbent" in diagnostic
+                        and "objective_bound" in diagnostic
+                    ):
+                        result_optimization_signals.append(
+                            f"objective_incumbent/objective_bound in {diagnostic_id}"
+                        )
+                    if "objective_reconciliation" in diagnostic:
+                        result_optimization_signals.append(
+                            f"objective_reconciliation in {diagnostic_id}"
+                        )
+                if (
+                    result_optimization_signals
+                    and "optimization" not in effective_validation_facets(model)
+                ):
+                    code = model_evidence_consistency_code(
+                        model, "FAMILY_EVIDENCE_MISMATCH"
+                    )
+                    migration_note = (
+                        f" schema_version={model.get('schema_version')!r} predates the 2.4.0 "
+                        "family/evidence consistency contract and must be migrated;"
+                        if code.endswith("_MIGRATION_REQUIRED")
+                        else ""
+                    )
+                    self.add(
+                        "G4",
+                        "BLOCK",
+                        code,
+                        (
+                            f"{model.get('id')}{migration_note} result {result_id} from experiment "
+                            f"{experiment.get('id')} triggers optimization evidence "
+                            f"{result_optimization_signals}; model_family={model.get('model_family')!r}, "
+                            f"validation_facets={model.get('validation_facets', [])!r}; add the "
+                            "'optimization' validation facet"
+                        ),
+                        artifact_id=result_id,
+                    )
+                    eligible = False
+            if model is not None and successful and (
                 model.get("method_selection", {}).get("decision") != "selected"
                 and str(model.get("id")) not in self.effective_primary_model_ids
             ):
@@ -2715,7 +3116,6 @@ class Audit:
                 self.result_eligibility[result_id] = False
                 continue
 
-            run = result.get("run", {})
             if run.get("argv") != experiment.get("command", {}).get("argv"):
                 self.add("G4", "BLOCK", "RUN_ARGV_MISMATCH", f"{result_id} argv differs from its experiment", artifact_id=result_id)
                 eligible = False
@@ -2750,33 +3150,30 @@ class Audit:
                     artifact_id=result_id,
                 )
                 eligible = False
-            try:
-                started = parse_rfc3339(run.get("started_at"))
-                finished = parse_rfc3339(run.get("finished_at"))
-                if finished < started:
-                    raise ValueError("finished_at precedes started_at")
-                if finished > datetime.now(timezone.utc) + MAX_CLOCK_SKEW:
-                    raise ValueError("finished_at is implausibly in the future")
-                promotion_event = self.promoted_model_events.get(str(model.get("id"))) if isinstance(model, dict) else None
-                if promotion_event is not None:
-                    event_id, promoted_at = promotion_event
-                    if event_id not in experiment.get("depends_on", []):
-                        raise ValueError("promoted-route experiment does not depend on its promotion event")
-                    if started < promoted_at:
-                        raise ValueError("run started before its fallback route was promoted")
-                timeout_seconds = experiment.get("timeout_seconds")
-                if isinstance(timeout_seconds, int) and (finished - started).total_seconds() > timeout_seconds:
-                    self.add(
-                        "G4",
-                        "BLOCK",
-                        "RUN_TIMEOUT_EXCEEDED",
-                        f"{result_id} elapsed time exceeds the predeclared {timeout_seconds}s budget",
-                        artifact_id=result_id,
-                    )
+            if time_valid and started is not None and finished is not None:
+                try:
+                    # Promotion and timeout checks are meaningful only after a
+                    # complete, valid execution interval has been established.
+                    promotion_event = self.promoted_model_events.get(str(model.get("id"))) if isinstance(model, dict) else None
+                    if promotion_event is not None:
+                        event_id, promoted_at = promotion_event
+                        if event_id not in experiment.get("depends_on", []):
+                            raise ValueError("promoted-route experiment does not depend on its promotion event")
+                        if started < promoted_at:
+                            raise ValueError("run started before its fallback route was promoted")
+                    timeout_seconds = experiment.get("timeout_seconds")
+                    if isinstance(timeout_seconds, int) and (finished - started).total_seconds() > timeout_seconds:
+                        self.add(
+                            "G4",
+                            "BLOCK",
+                            "RUN_TIMEOUT_EXCEEDED",
+                            f"{result_id} elapsed time exceeds the predeclared {timeout_seconds}s budget",
+                            artifact_id=result_id,
+                        )
+                        eligible = False
+                except ValueError as exc:
+                    self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
                     eligible = False
-            except ValueError as exc:
-                self.add("G4", "BLOCK", "RUN_TIME_INVALID", f"{result_id}: {exc}", artifact_id=result_id)
-                eligible = False
 
             if execution_complete:
                 if run.get("exit_code") != 0:
@@ -3345,6 +3742,21 @@ class Audit:
                             )
                             eligible = False
 
+                if (
+                    execution_complete
+                    and diagnostic.get("check_type") == "objective_reconciliation"
+                    and status != "NOT_APPLICABLE"
+                    and not self.validate_objective_reconciliation(
+                        result=result,
+                        experiment=experiment,
+                        model=model or {},
+                        diagnostic=diagnostic,
+                        metric_rows=metric_rows,
+                        metric_specs=metric_specs,
+                    )
+                ):
+                    eligible = False
+
                 threshold = check.get("threshold")
                 observed_measurement = diagnostic.get("observed")
                 if (
@@ -3880,10 +4292,12 @@ class Audit:
                         artifact_id=registry.get("id"),
                     )
                     continue
-                semantic_dependencies = {
-                    *figure.get("source_result_refs", []),
-                    *figure.get("claim_refs", []),
-                }
+                semantic_dependencies = set(figure.get("source_result_refs", []))
+                semantic_dependencies.update(
+                    self.id_definitions[reference][0]
+                    for reference in figure.get("claim_refs", [])
+                    if reference in self.id_definitions
+                )
                 missing_dependency_edges = semantic_dependencies.difference(registry_dependencies)
                 if missing_dependency_edges:
                     self.add(
@@ -4330,6 +4744,267 @@ class Audit:
                     artifact_id=result_id,
                 )
 
+    def validate_objective_reconciliation(
+        self,
+        *,
+        result: dict[str, Any],
+        experiment: dict[str, Any],
+        model: dict[str, Any],
+        diagnostic: dict[str, Any],
+        metric_rows: dict[str, list[dict[str, Any]]],
+        metric_specs: dict[str, dict[str, Any]],
+    ) -> bool:
+        """Recompute fixed-decision best-response gain from structured evidence.
+
+        The auditor cannot prove that the independent script actually solves
+        the claimed auxiliary optimization.  It can, however, make a same-
+        assignment re-sum structurally visible by requiring disjoint variable
+        scopes, a separately hashed code file and an explicit solver/method.
+        """
+
+        result_id = result.get("id")
+        check_ref = diagnostic.get("check_ref")
+        reconciliation = diagnostic.get("objective_reconciliation")
+        required_fields = {
+            "objective_metric_ref",
+            "fixed_primary_decisions",
+            "reoptimized_auxiliary_variables",
+            "solver_objective",
+            "best_response_objective",
+            "repair_gain",
+            "registration_timing",
+            "reconciliation_code_file",
+            "reconciliation_method",
+        }
+        if not isinstance(reconciliation, dict):
+            missing_fields = sorted(required_fields)
+        else:
+            missing_fields = sorted(required_fields.difference(reconciliation))
+        absolute_tolerance = (
+            reconciliation.get("absolute_tolerance")
+            if isinstance(reconciliation, dict)
+            else None
+        )
+        relative_tolerance = (
+            reconciliation.get("relative_tolerance")
+            if isinstance(reconciliation, dict)
+            else None
+        )
+        if missing_fields or not (
+            is_finite_number(absolute_tolerance) or is_finite_number(relative_tolerance)
+        ):
+            tolerance_note = (
+                ""
+                if is_finite_number(absolute_tolerance)
+                or is_finite_number(relative_tolerance)
+                else "; at least one finite tolerance is required"
+            )
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} lacks required reconciliation fields {missing_fields}{tolerance_note}",
+                artifact_id=result_id,
+            )
+            return False
+
+        fixed_primary = reconciliation.get("fixed_primary_decisions")
+        reoptimized_auxiliary = reconciliation.get("reoptimized_auxiliary_variables")
+        fixed_set = set(fixed_primary) if isinstance(fixed_primary, list) else set()
+        auxiliary_set = (
+            set(reoptimized_auxiliary)
+            if isinstance(reoptimized_auxiliary, list)
+            else set()
+        )
+        model_symbol_ids = {
+            symbol.get("id")
+            for symbol in model.get("symbols", [])
+            if isinstance(symbol, dict) and isinstance(symbol.get("id"), str)
+        }
+        unknown_variables = (fixed_set | auxiliary_set).difference(model_symbol_ids)
+        if (
+            not fixed_set
+            or not auxiliary_set
+            or fixed_set.intersection(auxiliary_set)
+            or unknown_variables
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_SCOPE_INVALID",
+                (
+                    f"{result_id}/{check_ref} requires non-empty disjoint primary/auxiliary symbol sets; "
+                    f"overlap={sorted(fixed_set.intersection(auxiliary_set))}, "
+                    f"unknown={sorted(unknown_variables)}"
+                ),
+                artifact_id=result_id,
+            )
+            return False
+
+        reconciliation_code = reconciliation.get("reconciliation_code_file")
+        code_signature = (
+            reconciliation_code.get("path"),
+            reconciliation_code.get("sha256"),
+        ) if isinstance(reconciliation_code, dict) else None
+        experiment_code_signatures = {
+            (item.get("path"), item.get("sha256"))
+            for item in experiment.get("code_files", [])
+            if isinstance(item, dict)
+        }
+        if code_signature is None or code_signature not in experiment_code_signatures:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} reconciliation code and SHA-256 are not bound in experiment.code_files",
+                artifact_id=result_id,
+            )
+            return False
+        try:
+            reconciliation_path = safe_project_path(
+                self.root, reconciliation_code.get("path"), must_exist=True
+            )
+            entrypoint_path = safe_project_path(
+                self.root, model.get("algorithm", {}).get("entrypoint"), must_exist=True
+            )
+            same_as_entrypoint = reconciliation_path == entrypoint_path or os.path.samefile(
+                reconciliation_path, entrypoint_path
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} cannot resolve its independent code binding: {exc}",
+                artifact_id=result_id,
+            )
+            return False
+        if same_as_entrypoint:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_NOT_INDEPENDENT",
+                f"{result_id}/{check_ref} reuses the experiment's main model entrypoint",
+                artifact_id=result_id,
+            )
+            return False
+
+        objective_metric_ref = reconciliation.get("objective_metric_ref")
+        objective_spec = metric_specs.get(objective_metric_ref)
+        objective_rows = metric_rows.get(objective_metric_ref, [])
+        solver_objective = reconciliation.get("solver_objective")
+        best_response_objective = reconciliation.get("best_response_objective")
+        recorded_gain = reconciliation.get("repair_gain")
+        measurements = (solver_objective, best_response_objective, recorded_gain)
+        objective_unit = objective_spec.get("unit") if isinstance(objective_spec, dict) else None
+        direction = objective_spec.get("direction") if isinstance(objective_spec, dict) else None
+        if (
+            len(objective_rows) != 1
+            or direction not in {"minimize", "maximize"}
+            or not isinstance(objective_unit, str)
+            or any(
+                not isinstance(measurement, dict)
+                or not is_finite_number(measurement.get("value"))
+                or measurement.get("unit") != objective_unit
+                for measurement in measurements
+            )
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_INCOMPLETE",
+                f"{result_id}/{check_ref} must bind one finite minimize/maximize metric with consistent units",
+                artifact_id=result_id,
+            )
+            return False
+
+        result_objective = objective_rows[0].get("measurement", {})
+        solver_value = decimal_number(solver_objective["value"])
+        best_response_value = decimal_number(best_response_objective["value"])
+        result_objective_value = (
+            result_objective.get("value")
+            if isinstance(result_objective, dict)
+            else None
+        )
+        if (
+            not is_finite_number(result_objective_value)
+            or result_objective.get("unit") != objective_unit
+            or decimal_number(result_objective_value) != solver_value
+        ):
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_MISMATCH",
+                f"{result_id}/{check_ref} solver_objective does not equal the registered result metric",
+                artifact_id=result_id,
+            )
+            return False
+
+        computed_gain = (
+            best_response_value - solver_value
+            if direction == "maximize"
+            else solver_value - best_response_value
+        )
+        registered_gain = decimal_number(recorded_gain["value"])
+        if registered_gain != computed_gain:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_RECONCILIATION_MISMATCH",
+                f"{result_id}/{check_ref} records repair_gain {registered_gain}; objectives require {computed_gain}",
+                artifact_id=result_id,
+            )
+            return False
+
+        timing_valid = True
+        if reconciliation.get("registration_timing") == "post_result":
+            if experiment.get("mode") == "exploratory":
+                self.add(
+                    "G4",
+                    "WARN",
+                    "POST_HOC_OBJECTIVE_RECONCILIATION_TOLERANCE",
+                    f"{result_id}/{check_ref} tolerance was registered after results and is exploratory only",
+                    artifact_id=result_id,
+                )
+            else:
+                self.add(
+                    "G4",
+                    "BLOCK",
+                    "CONFIRMATORY_OBJECTIVE_RECONCILIATION_TOLERANCE_POST_HOC",
+                    f"{result_id}/{check_ref} cannot use a post-result tolerance as confirmatory evidence",
+                    artifact_id=result_id,
+                )
+                timing_valid = False
+
+        allowed_tolerances: list[Decimal] = []
+        if is_finite_number(absolute_tolerance):
+            allowed_tolerances.append(decimal_number(absolute_tolerance))
+        if is_finite_number(relative_tolerance):
+            scale = max(abs(solver_value), abs(best_response_value))
+            allowed_tolerances.append(decimal_number(relative_tolerance) * scale)
+        allowed_gain = max(allowed_tolerances)
+        if abs(computed_gain) > allowed_gain:
+            self.add(
+                "G4",
+                "BLOCK",
+                "OBJECTIVE_REPAIR_GAIN_EXCEEDED",
+                (
+                    f"{result_id}/{check_ref} fixed-decision best response changes the {direction} "
+                    f"objective by {computed_gain} {objective_unit}; allowed magnitude is {allowed_gain}"
+                ),
+                artifact_id=result_id,
+            )
+            return False
+
+        self.add(
+            "G4",
+            "PASS",
+            "OBJECTIVE_RECONCILIATION_PASS",
+            f"{result_id}/{check_ref} repair_gain {computed_gain} is within tolerance {allowed_gain}",
+            artifact_id=result_id,
+        )
+        return timing_valid
+
     def validate_acceptance_rule(
         self,
         result: dict[str, Any],
@@ -4431,6 +5106,43 @@ class Audit:
     def validate_claims(self, claims_docs: list[dict[str, Any]], results: list[dict[str, Any]]) -> None:
         release_mode = self.release_mode()
         result_by_id = {result.get("id"): result for result in results}
+        experiment_by_id = {
+            document.get("id"): document
+            for artifact_id, document in self.documents.items()
+            if self.artifact_is_release_active(artifact_id)
+            and document.get("kind") == "experiment"
+        }
+
+        def solver_objective_interval(result: dict[str, Any]) -> tuple[Decimal, Decimal, str] | None:
+            intervals: list[tuple[Decimal, Decimal, str]] = []
+            for diagnostic in result.get("diagnostics", []):
+                if diagnostic.get("check_type") != "solver_optimality":
+                    continue
+                incumbent = diagnostic.get("objective_incumbent")
+                bound = diagnostic.get("objective_bound")
+                if not isinstance(incumbent, dict) or not isinstance(bound, dict):
+                    continue
+                incumbent_value = incumbent.get("value")
+                bound_value = bound.get("value")
+                unit = incumbent.get("unit")
+                if (
+                    not is_finite_number(incumbent_value)
+                    or not is_finite_number(bound_value)
+                    or not isinstance(unit, str)
+                    or bound.get("unit") != unit
+                ):
+                    continue
+                incumbent_decimal = decimal_number(incumbent_value)
+                bound_decimal = decimal_number(bound_value)
+                intervals.append(
+                    (
+                        min(incumbent_decimal, bound_decimal),
+                        max(incumbent_decimal, bound_decimal),
+                        unit,
+                    )
+                )
+            return intervals[0] if len(intervals) == 1 else None
+
         valid_assumption_ids = {
             assumption.get("id")
             for artifact_id, problem in self.documents.items()
@@ -4502,6 +5214,67 @@ class Audit:
                     for item in claim.get("evidence_refs", [])
                     if self.id_definitions.get(item.get("ref"), (None, None, None))[2] == "results"
                 ]
+                if claim.get("claim_type") == "comparative":
+                    comparison_result_ids = {
+                        result_id
+                        for result_id in evidence_result_ids
+                        if isinstance(result_id, str) and result_id in result_by_id
+                    }
+                    for result_id in tuple(comparison_result_ids):
+                        for diagnostic in result_by_id[result_id].get("diagnostics", []):
+                            if diagnostic.get("check_type") != "baseline_comparison":
+                                continue
+                            comparison_result_ids.update(
+                                baseline_result_ref
+                                for binding in diagnostic.get("comparison_bindings", [])
+                                if isinstance(binding, dict)
+                                for baseline_result_ref in [binding.get("baseline_result_ref")]
+                                if isinstance(baseline_result_ref, str) and baseline_result_ref in result_by_id
+                            )
+
+                    if len(comparison_result_ids) >= 2:
+                        timing_by_result: dict[str, str] = {}
+                        interval_by_result: dict[str, tuple[Decimal, Decimal, str]] = {}
+                        for result_id in sorted(comparison_result_ids):
+                            comparison_result = result_by_id[result_id]
+                            experiment = experiment_by_id.get(comparison_result.get("experiment_ref"))
+                            if isinstance(experiment, dict) and isinstance(experiment.get("decision_timing"), str):
+                                timing_by_result[result_id] = experiment["decision_timing"]
+                            objective_interval = solver_objective_interval(comparison_result)
+                            if objective_interval is not None:
+                                interval_by_result[result_id] = objective_interval
+
+                        if len(set(timing_by_result.values())) > 1:
+                            timing_summary = ", ".join(
+                                f"{result_id}={timing_by_result[result_id]}"
+                                for result_id in sorted(timing_by_result)
+                            )
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "DECISION_TIMING_MISMATCH",
+                                f"{claim.get('id')} compares results produced under different decision timing: {timing_summary}",
+                                artifact_id=registry.get("id"),
+                            )
+
+                        overlapping_pairs: list[tuple[str, str]] = []
+                        interval_result_ids = sorted(interval_by_result)
+                        for left_index, left_result_id in enumerate(interval_result_ids):
+                            left_lower, left_upper, left_unit = interval_by_result[left_result_id]
+                            for right_result_id in interval_result_ids[left_index + 1:]:
+                                right_lower, right_upper, right_unit = interval_by_result[right_result_id]
+                                if left_unit != right_unit:
+                                    continue
+                                if max(left_lower, right_lower) <= min(left_upper, right_upper):
+                                    overlapping_pairs.append((left_result_id, right_result_id))
+                        if overlapping_pairs:
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "RANKING_WITHIN_SOLVER_GAP",
+                                f"{claim.get('id')} ranks or compares results whose solver objective intervals overlap: {overlapping_pairs}",
+                                artifact_id=registry.get("id"),
+                            )
                 for assertion in claim.get("numeric_assertions", []):
                     metric_ref = assertion.get("metric_ref")
                     source_token = assertion.get("source_token", "")
@@ -4533,6 +5306,62 @@ class Audit:
                         self.add("G5", "BLOCK", code, f"{claim.get('id')} has {len(matches)} directly evidenced values for {metric_ref}", artifact_id=registry.get("id"))
                         continue
                     result_id, metric = matches[0]
+                    assertion_result = result_by_id.get(result_id, {})
+                    assertion_experiment = experiment_by_id.get(
+                        assertion_result.get("experiment_ref"), {}
+                    )
+                    assertion_model = self.documents.get(
+                        assertion_experiment.get("model_ref"), {}
+                    )
+                    if (
+                        "optimization" in effective_validation_facets(assertion_model)
+                        and scenario_holdout_is_actionable(assertion_model)
+                    ):
+                        metric_spec = next(
+                            (
+                                row
+                                for row in assertion_experiment.get("metrics", [])
+                                if row.get("id") == metric_ref
+                            ),
+                            None,
+                        )
+                        scenario_set_ref = (
+                            metric_spec.get("scenario_set_ref")
+                            if isinstance(metric_spec, dict)
+                            else None
+                        )
+                        scenario_set = next(
+                            (
+                                row
+                                for row in assertion_experiment.get("scenario_sets", [])
+                                if isinstance(row, dict)
+                                and row.get("id") == scenario_set_ref
+                            ),
+                            None,
+                        )
+                        if scenario_set is None:
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "FINAL_CLAIM_METRIC_SCENARIO_UNBOUND",
+                                (
+                                    f"{claim.get('id')}/{metric_ref} does not bind a local holdout "
+                                    "scenario set"
+                                ),
+                                artifact_id=registry.get("id"),
+                            )
+                        elif scenario_set.get("role") != "holdout":
+                            self.add(
+                                "G5",
+                                "BLOCK",
+                                "FINAL_CLAIM_SELECTION_SCENARIO_METRIC",
+                                (
+                                    f"{claim.get('id')}/{metric_ref} is sourced from "
+                                    f"{scenario_set_ref} role={scenario_set.get('role')!r}; final claims "
+                                    "must use holdout metrics"
+                                ),
+                                artifact_id=registry.get("id"),
+                            )
                     measurement = metric.get("measurement", {})
                     values = (
                         measurement.get("value"),
@@ -5823,6 +6652,7 @@ def definition_semantic_kind(document_kind: str | None, location: str) -> str:
         (r"/symbols/\d+/(?:id)$", "symbol"),
         (r"/formulation/(?:equations|objectives|constraints)/\d+/(?:id)$", "formula"),
         (r"/validation_plan/checks/\d+/(?:id)$", "validation_check"),
+        (r"/scenario_sets/\d+/(?:id)$", "scenario_set"),
         (r"/baseline_comparison_rules/\d+/(?:id)$", "comparison_rule"),
         (r"/metrics/\d+/(?:id)$", "metric"),
         (r"/outputs/\d+/(?:id)$", "output"),
@@ -5865,6 +6695,8 @@ def expected_reference_kinds(source_kind: str | None, location: str) -> set[str]
         return {"competition_profile"}
     if location.endswith("/comparison_rule_ref"):
         return {"comparison_rule"}
+    if location.endswith("/scenario_set_ref"):
+        return {"scenario_set"}
     if location.endswith("/baseline_result_ref") or location.endswith("/producer_ref") or location.endswith("/trigger_result_ref"):
         return {"results"}
     if location.endswith("/symbol_ref"):

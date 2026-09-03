@@ -77,14 +77,20 @@ question → model → experiment → result → claim → figure/table/paper
 | descriptive | 输入完整性 |
 | statistical | 残差诊断、不确定性 |
 | prediction | 基线、泄漏、预测误差、不确定性 |
-| optimization | 约束可行性、求解状态/最优性、基线、敏感性 |
+| optimization | 约束可行性、求解状态/最优性、固定主决策后的目标对账、基线、情景泄漏、敏感性 |
 | simulation | 边界情形、收敛、守恒/平衡、数值稳定性 |
 | evaluation | 基线、敏感性、排名稳定性 |
 | causal | 可识别性、反证检查、不确定性 |
 
-`hybrid` 和 `other` 不能由固定标签决定检查面，仍由 G2 人工 review 核对其结构化计划是否覆盖真实失败方式。
+`hybrid` 和 `other` 不能由单一标签决定检查面，必须用非空 `validation_facets` 选择上述一个或多个模型族；审计器对所选 facet 的必需检查取并集。其他模型族省略该字段时等价于只选择自身模型族。G2 人工 review 仍须核对这些结构化检查是否覆盖真实失败方式。
+
+从 `2.4.0` 起，任何带 `numeric_assertions` 的 final claim 只要直接引用一个模型，或引用由该模型实验产生的 result，该模型的 `formulation.equations`、`objectives`、`constraints` 三者至少有一项非空；空骨架不能支撑定量论文结论。审计器在 G2 报告模型 ID 和相关 claim ID，但不会要求纯描述或纯统计模型虚构决策变量。
+
+模型族还要与已经登记的证据一致。若某个绑定实验包含 `direction: minimize/maximize` 的 metric，或绑定 result 的 diagnostic 出现成对 `objective_incumbent/objective_bound`、`objective_reconciliation`，则 `effective_validation_facets` 必须包含 `optimization`。实验信号在 G3 检查，结果信号在 G4 检查；预先声明更严格的 `optimization` facet 而尚未产生这些信号是合法的，不作反向推断。
 
 优化模型的启发式结果默认只能支持“当前找到的最好解”。若要使用“全局最优”，必须提供严格证明、可核验证书或有效的上下界，并经过人工复核。
+
+`objective_reconciliation` 与 `solver_optimality` 正交：前者固定已经输出的主决策变量，再用独立代码重新优化其余辅助变量，检查当前实现是否遗漏了可改善的最优响应；后者只描述求解器对其所接收模型的求解质量。对账 diagnostic 必须声明非空且不相交的主决策/辅助变量标识，绑定实验中独立于主入口的代码文件及 SHA-256，记录求解方法、目标 metric、原目标、最优响应目标、方向化 `repair_gain` 和预登记容差。审计器只能强制这些结构并重算差值，不能证明独立脚本确实实现了正确的重新优化。
 
 ### `model_promotion`
 
@@ -98,6 +104,10 @@ question → model → experiment → result → claim → figure/table/paper
 
 保存执行参数数组、相对工作目录、代码和环境哈希、随机种子、切分、基线、指标、接受规则、输出及比较器。`data_refs` 只能引用已经批准用于建模的数据；`baseline_refs` 必须与所选模型的 baseline policy 一致。基线模型还要有同子问、同指标定义的可比实验，不能只在文字中出现。
 
+`mode` 表示实验在证据流程中的用途（探索、确认或验证），`decision_timing` 表示决策相对于不确定信息何时作出，二者不重叠。`here_and_now` 在不确定性揭示前固定决策，`wait_and_see` 在情景揭示后再决策，`recourse` 允许获得部分信息后采取补救决策。跨结果的差值、排名或基线优越性判断只能比较相同 `decision_timing` 的实验。
+
+随机情景优化必须在 `scenario_sets` 中分别登记 `role: selection` 与 `role: holdout` 的非空情景集，并为每组保存种子、生成器 SHA-256 和情景字节 SHA-256。selection 用于选方案或调参，holdout 只用于冻结方案后的独立评价；两类集合不得复用相同的 `scenario_sha256`。每个定量 metric 用 `scenario_set_ref` 绑定其实际来源，final claim 只能引用来自本实验 holdout 情景集的 metric。确定性优化显式写 `scenario_sets: []`，并把 `holdout_leakage` 记为 `not_applicable` 且说明理由，不能伪造情景集。
+
 `code_files` 必须包含实际入口和本次实验依赖的项目代码；任何支持 release claim 的 eligible result，其全部 `code_files` 都必须在 manifest 中登记为 `required: true / role: code` 的 deliverable，不能只交入口脚本。
 
 每条接受规则用 `registration_timing` 区分看到相关结果前登记的 `pre_result` 与看到结果后形成的 `post_result`；后者只能作为探索性判断，不能改写成预注册证据。`network_access` 仅记录复现条件，不用于规定参赛者能否联网，也不会自动禁用检索。
@@ -109,6 +119,10 @@ question → model → experiment → result → claim → figure/table/paper
 保存一次运行实际使用的命令、环境、指纹、输入输出哈希、指标、不确定性、诊断和失败信息。结果中的 `output_ref` 指向实验预先声明的输出 ID，不重复定义新 ID。失败运行应保留。缺失数值用 `null` 和 `missing_reason` 表示，不得用 0、NaN 或无穷值伪装。
 
 成功结果必须记录实际完成的重复次数，并为每项 `required` 或 `conditional` validation check 提供唯一的结构化 diagnostic。diagnostic 绑定 `check_ref`，保存类型、状态、严重度、过程、观察、结论和证据文件；若计划预先声明了数值阈值，审计器用实际观测值、单位和运算符重新计算 PASS/BLOCK，不能接受手填状态。缺失 required diagnostic、阻断性诊断未通过、重复次数不足或 bundled 输入没有进入运行输入清单时，该结果不能支持 final claim。
+
+求解器诊断可成对填写 `objective_incumbent` 与 `objective_bound`，两者都是带单位的 measurement，任一出现时另一项也必须出现。incumbent 表示当前可行候选的目标值，bound 表示对全局最优值有效的界；最小化问题的质量区间为 `[bound, incumbent]`，最大化问题为 `[incumbent, bound]`。候选区间重叠时不能据此声称严格排名或优于关系。
+
+目标对账诊断使用 `objective_reconciliation` 对象。`objective_metric_ref` 确定目标方向和单位；最大化的 `repair_gain = best_response_objective - solver_objective`，最小化则反向相减，正值表示固定主决策后仍存在可修复改善。审计器还要求 `solver_objective` 等于该 result 已登记的 metric，并按 `max(absolute_tolerance, relative_tolerance × max(|solver_objective|, |best_response_objective|))`（只使用实际提供的容差项）判断差值幅度。`registration_timing: post_result` 沿用接受规则的证据限制：探索性运行只给出事后提示，确认性或验证性运行不能据此形成 eligible 证据。
 
 当主方法声明基线时，基线必须有可比且 eligible 的结果。主结果还必须在 `depends_on` 和完整指纹闭包中绑定实际采用的 baseline result；否则基线结果变化不会传播失效，主结果也不得进入结论。
 

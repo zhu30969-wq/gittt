@@ -1,0 +1,18 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E01-complete-chain",
+  "fixture_profile": "e01-optimization",
+  "solver_objective": 1.25,
+  "solver_bound": 1.3215,
+  "solver_relative_gap": 0.0572,
+  "negative_best_response_objective": 1.250075,
+  "negative_repair_gain": 0.000075,
+  "negative_repair_share": 0.00006,
+  "absolute_tolerance": 0.000001,
+  "expected_report_fields": [
+    "workflow_state",
+    "last_valid_gate",
+    "rollback_target",
+    "next_legal_action"
+  ]
+}

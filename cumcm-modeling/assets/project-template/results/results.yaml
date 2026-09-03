@@ -1,4 +1,4 @@
-schema_version: 2.0.0
+schema_version: 2.4.0
 kind: results
 id: result:main
 revision: 1
@@ -14,12 +14,12 @@ fingerprints:
   experiment:main: "0000000000000000000000000000000000000000000000000000000000000000"
 run:
   run_id: run:unexecuted
-  started_at: "2026-01-01T00:00:00Z"
-  finished_at: "2026-01-01T00:00:00Z"
+  started_at: null
+  finished_at: null
   argv: [python, code/main.py]
   cwd: .
   exit_code: 1
-  seeds: [2026]
+  seeds: [__DEFAULT_SEED__]
   repetitions_completed: 0
   platform: UNSET
   git_commit: null
