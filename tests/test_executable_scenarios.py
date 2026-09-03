@@ -15,6 +15,7 @@ EXPECTED_EXECUTABLE_IDS = {
     "E01-complete-chain",
     "E03-heuristic-optimum",
     "E11-baseline-evidence",
+    "E12-structured-diagnostic",
     "E17-held-out-resume",
     "E18-hybrid-validation-facet-union",
     "E19-scenario-set-holdout-isolation",
@@ -47,7 +48,7 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         for scenario in self.scenarios():
             by_status.setdefault(scenario["status"], []).append(scenario)
 
-        self.assertEqual(13, len(by_status.get("specification_only", [])))
+        self.assertEqual(12, len(by_status.get("specification_only", [])))
         executable = by_status.get("executable", [])
         self.assertEqual(
             EXPECTED_EXECUTABLE_IDS,
@@ -135,6 +136,28 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
                 "UPSTREAM_STALE",
             },
             set(config["stale_codes"]),
+        )
+
+    def test_e12_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E12-structured-diagnostic")
+        self.assertEqual(0.95, config["observed_score"])
+        self.assertEqual("==", config["passing_operator"])
+        self.assertEqual(">=", config["contradictory_operator"])
+        self.assertGreater(
+            config["contradictory_threshold"],
+            config["observed_score"],
+        )
+        self.assertEqual(
+            "VALIDATION_CHECK_EVIDENCE_AMBIGUOUS",
+            config["evidence_ambiguity_code"],
+        )
+        self.assertEqual(
+            "DIAGNOSTIC_STATUS_MISMATCH",
+            config["status_mismatch_code"],
+        )
+        self.assertEqual(
+            "DIAGNOSTIC_THRESHOLD_PASS",
+            config["threshold_pass_code"],
         )
 
     def test_e18_config_matches_the_registry_contract(self) -> None:

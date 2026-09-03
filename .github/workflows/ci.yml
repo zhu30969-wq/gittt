@@ -284,6 +284,12 @@ jobs:
           python -X utf8 evals/run_baseline_evidence.py \
             "$RUNNER_TEMP/cumcm-e11-baseline-evidence"
 
+      - name: Exercise E12 structured diagnostic evidence
+        shell: bash
+        run: |
+          python -X utf8 evals/run_structured_diagnostic.py \
+            "$RUNNER_TEMP/cumcm-e12-structured-diagnostic"
+
       - name: Exercise held-out non-overwriting recovery
         shell: bash
         run: |
@@ -387,6 +393,8 @@ jobs:
           python -X utf8 evals/run_heuristic_optimum.py (Join-Path $env:RUNNER_TEMP 'cumcm-e03-heuristic-optimum')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -X utf8 evals/run_baseline_evidence.py (Join-Path $env:RUNNER_TEMP 'cumcm-e11-baseline-evidence')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -X utf8 evals/run_structured_diagnostic.py (Join-Path $env:RUNNER_TEMP 'cumcm-e12-structured-diagnostic')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -X utf8 evals/run_hybrid_validation_facet_union.py (Join-Path $env:RUNNER_TEMP 'cumcm-e18-hybrid-facets')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

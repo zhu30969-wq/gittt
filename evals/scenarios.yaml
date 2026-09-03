@@ -76,8 +76,9 @@ scenarios:
       - "Both primary and baseline have eligible runs; the primary result depends on the exact baseline result used."
       - "Changing baseline evidence makes the comparison and downstream claims stale."
   - id: "E12-structured-diagnostic"
-    status: "specification_only"
-    fixture: "diagnostic-with-predeclared-threshold"
+    status: "executable"
+    fixture: "structured_diagnostic_scenario.json"
+    executable: "run_structured_diagnostic.py"
     expected_invariants:
       - "Every required or conditional validation check has exactly one result diagnostic."
       - "Observed values and units are evaluated against the predeclared operator and threshold."
