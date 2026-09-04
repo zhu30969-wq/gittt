@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E02-time-series-leakage",
+  "fixture_profile": "synthetic-ordered-series-with-known-lookahead",
+  "seed": 202002,
+  "sample_count": 72,
+  "outer_splits": 4,
+  "inner_splits": 2,
+  "future_offset": 2,
+  "expected_leak_code": "TEMPORAL_FEATURE_LOOKAHEAD",
+  "expected_tuning_scope": "outer_train_only"
+}

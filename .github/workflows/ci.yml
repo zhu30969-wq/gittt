@@ -34,6 +34,7 @@ jobs:
           cache-dependency-path: |
             cumcm-modeling/scripts/requirements.txt
             cumcm-modeling/assets/solver-toolkit/requirements.txt
+            cumcm-modeling/assets/predict-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
@@ -42,6 +43,9 @@ jobs:
 
       - name: Install solver toolkit dependencies
         run: python -m pip install -r cumcm-modeling/assets/solver-toolkit/requirements.txt
+
+      - name: Install prediction toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/predict-toolkit/requirements.txt
 
       - name: Fetch pinned quick_validate
         env:
@@ -142,11 +146,19 @@ jobs:
       - name: Run standalone solver toolkit tests
         run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/solver-toolkit/tests -p "test_*.py" -v
 
+      - name: Run standalone prediction toolkit tests
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/predict-toolkit/tests -p "test_*.py" -v
+
       - name: Run solver recipe examples
         run: |
           python -X utf8 cumcm-modeling/references/recipes/examples/continuous_blackbox.py
           python -X utf8 cumcm-modeling/references/recipes/examples/resource_timing_milp.py
           python -X utf8 cumcm-modeling/references/recipes/examples/geometric_kinematic_coverage.py
+
+      - name: Run prediction and evaluation recipe examples
+        run: |
+          python -X utf8 cumcm-modeling/references/recipes/examples/prediction_and_classification.py
+          python -X utf8 cumcm-modeling/references/recipes/examples/evaluation_and_ranking.py
 
       - name: Verify initializer CLI refusal and conflict preservation
         shell: bash
@@ -286,11 +298,23 @@ jobs:
           python -X utf8 evals/run_complete_chain.py \
             "$RUNNER_TEMP/cumcm-e01-complete-chain"
 
+      - name: Exercise E02 temporal leakage detection
+        shell: bash
+        run: |
+          python -X utf8 evals/run_time_series_leakage.py \
+            "$RUNNER_TEMP/cumcm-e02-time-series-leakage"
+
       - name: Exercise E03 heuristic feasibility and claim strength
         shell: bash
         run: |
           python -X utf8 evals/run_heuristic_optimum.py \
             "$RUNNER_TEMP/cumcm-e03-heuristic-optimum"
+
+      - name: Exercise E04 ranking stability
+        shell: bash
+        run: |
+          python -X utf8 evals/run_ranking_stability.py \
+            "$RUNNER_TEMP/cumcm-e04-ranking-stability"
 
       - name: Exercise E05 analytic mechanism convergence
         shell: bash
@@ -400,6 +424,7 @@ jobs:
           cache-dependency-path: |
             cumcm-modeling/scripts/requirements.txt
             cumcm-modeling/assets/solver-toolkit/requirements.txt
+            cumcm-modeling/assets/predict-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
@@ -409,11 +434,29 @@ jobs:
       - name: Install solver toolkit dependencies
         run: python -m pip install -r cumcm-modeling/assets/solver-toolkit/requirements.txt
 
+      - name: Install prediction toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/predict-toolkit/requirements.txt
+
       - name: Run complete Windows unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Run standalone solver toolkit tests on Windows
         run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/solver-toolkit/tests -p "test_*.py" -v
+
+      - name: Run standalone prediction toolkit tests on Windows
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/predict-toolkit/tests -p "test_*.py" -v
+
+      - name: Exercise E02 temporal leakage detection on Windows
+        shell: pwsh
+        run: |
+          python -X utf8 evals/run_time_series_leakage.py (Join-Path $env:RUNNER_TEMP 'cumcm-e02-time-series-leakage')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Exercise E04 ranking stability on Windows
+        shell: pwsh
+        run: |
+          python -X utf8 evals/run_ranking_stability.py (Join-Path $env:RUNNER_TEMP 'cumcm-e04-ranking-stability')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Exercise E05 analytic mechanism convergence on Windows
         shell: pwsh

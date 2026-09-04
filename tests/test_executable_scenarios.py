@@ -13,7 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_ROOT = REPO_ROOT / "evals"
 EXPECTED_EXECUTABLE_IDS = {
     "E01-complete-chain",
+    "E02-time-series-leakage",
     "E03-heuristic-optimum",
+    "E04-ranking-stability",
     "E05-mechanism-convergence",
     "E11-baseline-evidence",
     "E12-structured-diagnostic",
@@ -49,7 +51,7 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         for scenario in self.scenarios():
             by_status.setdefault(scenario["status"], []).append(scenario)
 
-        self.assertEqual(11, len(by_status.get("specification_only", [])))
+        self.assertEqual(9, len(by_status.get("specification_only", [])))
         executable = by_status.get("executable", [])
         self.assertEqual(
             EXPECTED_EXECUTABLE_IDS,
@@ -103,6 +105,13 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         self.assertIn("passes", orthogonality[0])
         self.assertIn("blocks", orthogonality[0])
 
+    def test_e02_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E02-time-series-leakage")
+        self.assertEqual("TEMPORAL_FEATURE_LOOKAHEAD", config["expected_leak_code"])
+        self.assertEqual("outer_train_only", config["expected_tuning_scope"])
+        self.assertGreaterEqual(config["sample_count"], 4 * config["outer_splits"])
+        self.assertGreater(config["future_offset"], 0)
+
     def test_e03_config_matches_the_registry_contract(self) -> None:
         config = self.fixture_for("E03-heuristic-optimum")
         self.assertEqual("e01-optimization", config["base_fixture_profile"])
@@ -117,6 +126,17 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         )
         self.assertIn("best feasible", config["supported_claim_statement"].lower())
         self.assertIn("globally optimal", config["unsupported_claim_statement"].lower())
+
+    def test_e04_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E04-ranking-stability")
+        self.assertEqual(len(config["indicator_directions"]), len(config["base_weights"]))
+        self.assertAlmostEqual(1.0, sum(config["base_weights"]))
+        self.assertTrue(
+            all(abs(sum(weights) - 1.0) < 1e-12 for weights in config["perturbed_weights"])
+        )
+        self.assertEqual(1, config["expected_flip_pair_count"])
+        self.assertEqual(1, config["expected_max_rank_displacement"])
+        self.assertGreaterEqual(config["minimum_expected_spearman"], 0.95)
 
     def test_e05_config_matches_the_registry_contract(self) -> None:
         config = self.fixture_for("E05-mechanism-convergence")
