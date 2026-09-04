@@ -97,6 +97,13 @@ question → model → experiment → result → claim → figure/table/paper
 
 案例用于检查遗漏、比较验证方法和寻找反例，不能替当前题目的数据作决定。
 
+### 求解与独立 oracle
+
+- `assets/solver-toolkit` 统一返回 incumbent、有效 bound/gap、固定种子、耗时和原始解；没有数学 bound 时强制让 gap 为空；
+- 小规模验证优先完全枚举或 `scipy.optimize.milp` 精确 oracle，区分 `exact_match`、`suboptimal` 与 `not_reducible`；
+- 三个结构化配方覆盖连续黑箱优化、资源时序 MILP、几何/运动覆盖，并把真实失败模式与可运行示例放在算法名称之前；
+- 优秀论文数值仅作参照，不参与自动 PASS/BLOCK 判定。
+
 ### 前置筛选与结构化诊断
 
 - 输入先分类为原始数据、结果模板、说明、参考资料或派生数据；仅靠文件名推测的角色不能被批准用于建模；
@@ -117,12 +124,15 @@ question → model → experiment → result → claim → figure/table/paper
 cumcm-modeling/
 ├── SKILL.md
 ├── agents/openai.yaml
-├── assets/project-template/
+├── assets/
+│   ├── project-template/
+│   └── solver-toolkit/
 ├── references/
 │   ├── profiles.md
 │   ├── contracts.md
 │   ├── workflow.md
 │   ├── model-selection.md
+│   ├── recipes/
 │   ├── case-use.md
 │   ├── cases/
 │   │   └── _TEMPLATE.md
@@ -165,6 +175,8 @@ evals/
 ├── _forward_scenario_support.py
 ├── complete_chain_scenario.json
 ├── run_complete_chain.py
+├── e05_mechanism_convergence_scenario.json
+├── run_mechanism_convergence.py
 ├── held_out_resume_scenario.json
 ├── run_held_out_resume.py
 ├── hybrid_validation_facet_union_scenario.json

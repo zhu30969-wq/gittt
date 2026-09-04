@@ -31,12 +31,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: cumcm-modeling/scripts/requirements.txt
+          cache-dependency-path: |
+            cumcm-modeling/scripts/requirements.txt
+            cumcm-modeling/assets/solver-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r cumcm-modeling/scripts/requirements.txt
+
+      - name: Install solver toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/solver-toolkit/requirements.txt
 
       - name: Fetch pinned quick_validate
         env:
@@ -133,6 +138,15 @@ jobs:
 
       - name: Run complete unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Run standalone solver toolkit tests
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/solver-toolkit/tests -p "test_*.py" -v
+
+      - name: Run solver recipe examples
+        run: |
+          python -X utf8 cumcm-modeling/references/recipes/examples/continuous_blackbox.py
+          python -X utf8 cumcm-modeling/references/recipes/examples/resource_timing_milp.py
+          python -X utf8 cumcm-modeling/references/recipes/examples/geometric_kinematic_coverage.py
 
       - name: Verify initializer CLI refusal and conflict preservation
         shell: bash
@@ -278,6 +292,12 @@ jobs:
           python -X utf8 evals/run_heuristic_optimum.py \
             "$RUNNER_TEMP/cumcm-e03-heuristic-optimum"
 
+      - name: Exercise E05 analytic mechanism convergence
+        shell: bash
+        run: |
+          python -X utf8 evals/run_mechanism_convergence.py \
+            "$RUNNER_TEMP/cumcm-e05-mechanism-convergence"
+
       - name: Exercise E11 baseline evidence closure
         shell: bash
         run: |
@@ -377,15 +397,29 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: cumcm-modeling/scripts/requirements.txt
+          cache-dependency-path: |
+            cumcm-modeling/scripts/requirements.txt
+            cumcm-modeling/assets/solver-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r cumcm-modeling/scripts/requirements.txt
 
+      - name: Install solver toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/solver-toolkit/requirements.txt
+
       - name: Run complete Windows unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Run standalone solver toolkit tests on Windows
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/solver-toolkit/tests -p "test_*.py" -v
+
+      - name: Exercise E05 analytic mechanism convergence on Windows
+        shell: pwsh
+        run: |
+          python -X utf8 evals/run_mechanism_convergence.py (Join-Path $env:RUNNER_TEMP 'cumcm-e05-mechanism-convergence')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Exercise executable mechanism scenarios on Windows
         shell: pwsh

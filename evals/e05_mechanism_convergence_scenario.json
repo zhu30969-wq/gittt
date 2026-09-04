@@ -1,0 +1,15 @@
+{
+  "schema_version": "2.4.0",
+  "id": "E05-mechanism-convergence",
+  "fixture_profile": "analytic-harmonic-oscillator",
+  "theoretical_order": 4.0,
+  "order_absolute_tolerance": 0.25,
+  "positive_steps": [0.2, 0.1, 0.05, 0.025],
+  "coarse_steps": [1.0, 0.5],
+  "final_time_s": 2.0,
+  "convergence_tolerance_m": 1.0e-7,
+  "conservation_tolerance_m2_s2": 1.0e-8,
+  "dimension_mismatch_limit": 0,
+  "threshold_pass_code": "DIAGNOSTIC_THRESHOLD_PASS",
+  "threshold_failure_code": "DIAGNOSTIC_THRESHOLD_FAILED"
+}

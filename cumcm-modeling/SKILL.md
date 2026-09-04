@@ -58,6 +58,7 @@ description: "Orchestrate, continue, or audit CUMCM（全国大学生数学建�
 - 形成候选模型或判断是否套模：读取 [模型选择](references/model-selection.md)。确定 `model_family`、`validation_facets` 与 `task_type` 后，先读其中的验证覆盖表并把对应 check 写入 `validation_plan.checks`；`hybrid` 与 `other` 必须声明非空 facets，不要等审计出现 `BLOCK` 后再补。
 - 使用历年题目、优秀论文或案例元数据：读取 [案例使用](references/case-use.md)。只有案例检索或比较任务才读取 `references/cases/`。
 - 编写代码、运行实验、检查结果可信度：读取 [验证规范](validation.md)。
+- 求解优化与几何/运动仿真问题：按结构选择 [连续黑箱优化](references/recipes/continuous-blackbox-global-optimization.md)、[资源时序 MILP](references/recipes/resource-timing-milp.md) 或 [几何运动覆盖](references/recipes/geometric-kinematic-coverage.md)，并复用其中的统一求解接口与小规模 oracle；论文数值只作参照。
 - 组织三人分工、交接、冲突解决或审批：读取 [团队协作](references/team-collaboration.md)；评估竞赛时限内的登记成本、维护瓶颈或复跑自动化时，再读 [真实走查维护成本](references/field-run-maintainability.md)。
 - 阶段评审、质量评分或决定是否前进：读取 [能力量表](references/rubric.md)。
 - 写作、编译、图表和最终 PDF：读取 [论文交付](references/paper-delivery.md)。

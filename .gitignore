@@ -23,3 +23,6 @@ venv/
 ._*
 Thumbs.db
 Desktop.ini
+
+# Local scratch renderings of source material; never committed.
+tmp/

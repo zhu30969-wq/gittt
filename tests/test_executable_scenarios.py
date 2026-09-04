@@ -14,6 +14,7 @@ EVAL_ROOT = REPO_ROOT / "evals"
 EXPECTED_EXECUTABLE_IDS = {
     "E01-complete-chain",
     "E03-heuristic-optimum",
+    "E05-mechanism-convergence",
     "E11-baseline-evidence",
     "E12-structured-diagnostic",
     "E17-held-out-resume",
@@ -48,7 +49,7 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         for scenario in self.scenarios():
             by_status.setdefault(scenario["status"], []).append(scenario)
 
-        self.assertEqual(12, len(by_status.get("specification_only", [])))
+        self.assertEqual(11, len(by_status.get("specification_only", [])))
         executable = by_status.get("executable", [])
         self.assertEqual(
             EXPECTED_EXECUTABLE_IDS,
@@ -116,6 +117,25 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         )
         self.assertIn("best feasible", config["supported_claim_statement"].lower())
         self.assertIn("globally optimal", config["unsupported_claim_statement"].lower())
+
+    def test_e05_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E05-mechanism-convergence")
+        self.assertEqual(4.0, config["theoretical_order"])
+        self.assertEqual(4, len(config["positive_steps"]))
+        self.assertTrue(
+            all(
+                left > right
+                for left, right in zip(
+                    config["positive_steps"], config["positive_steps"][1:]
+                )
+            )
+        )
+        self.assertLess(
+            config["convergence_tolerance_m"], config["coarse_steps"][-1]
+        )
+        self.assertEqual(
+            "DIAGNOSTIC_THRESHOLD_FAILED", config["threshold_failure_code"]
+        )
 
     def test_e11_config_matches_the_registry_contract(self) -> None:
         config = self.fixture_for("E11-baseline-evidence")
