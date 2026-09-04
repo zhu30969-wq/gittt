@@ -12,7 +12,20 @@
 6. 至少保留一组从未用于调试的 held-out 场景；
 7. 测试不得自动删除成批文件，临时目录留存并报告位置。
 
-仓库提供八个可执行的离线场景。E01 从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
+当前场景数量、执行状态与完整 ID 清单以以下生成块为准。
+
+<!-- BEGIN GENERATED: scenario-status -->
+### 场景状态注册表
+
+> 本块由 `scripts/export_scenario_status.py` 从 `evals/scenarios.yaml` 生成；场景数量、状态与 ID 清单不得手工维护。
+
+| 状态 | 数量 | 完整 ID 清单 |
+|---|---:|---|
+| `executable` | 11 | `E01-complete-chain`、`E02-time-series-leakage`、`E03-heuristic-optimum`、`E04-ranking-stability`、`E05-mechanism-convergence`、`E11-baseline-evidence`、`E12-structured-diagnostic`、`E17-held-out-resume`、`E18-hybrid-validation-facet-union`、`E19-scenario-set-holdout-isolation`、`E20-decision-timing-comparability` |
+| `specification_only` | 9 | `E06-stale-propagation`、`E07-paper-engine-isolation`、`E08-human-science-boundary`、`E09-posthoc-and-derived-numbers`、`E10-input-role-preflight`、`E13-release-pdf`、`E14-immutable-fallback-promotion`、`E15-paper-build-and-proof-package`、`E16-code-deliverable-closure` |
+<!-- END GENERATED: scenario-status -->
+
+完整链场景从初始化占位推进到完整合成优化 release，真实重跑主入口与独立最优响应脚本，再验证目标对账的负向变异和字节级恢复：
 
 ```bash
 python -X utf8 evals/run_complete_chain.py <new-target-path>
@@ -81,7 +94,7 @@ python -X utf8 evals/run_decision_timing_comparability.py <new-target-path>
 - `executable`：仓库中存在真实 fixture 和可运行 harness，可报告本次实际运行结果；
 - `specification_only`：只定义待观察行为，不能声称已经完成独立 Agent 端到端评测。
 
-当前 E01、E03、E11、E12、E17、E18、E19 与 E20 具备独立可执行 harness。E02、E04–E10 与 E13–E16 是 specification-only 行为规范；部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
+具体状态以本页生成块为准。部分不变量虽被普通审计器单元测试覆盖，也不能改写成“独立 Agent 已端到端解题”。
 
 ## P0 行为场景
 
@@ -117,10 +130,6 @@ python -X utf8 evals/run_decision_timing_comparability.py <new-target-path>
 
 ## 待建设的可执行场景
 
-后续至少需要为以下行为补齐独立材料、fixture、harness 和结果判定，完成前保持 `specification_only`：
-
-- 时序预测泄漏与时间顺序验证；
-- 综合评价中的权重扰动和排名翻转；
-- 数据、结果模板、说明与参考资料混合目录的输入角色识别。
+尚未具备可执行 harness 的范围以本页生成块中的 `specification_only` 清单为准；升级状态前必须补齐独立材料、fixture、harness 和结果判定。
 
 不得为了填满场景而生成虚构的优秀论文或伪造独立 Agent 结果。
