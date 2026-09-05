@@ -100,6 +100,8 @@ question → model → experiment → result → claim → figure/table/paper
 ### 求解与独立 oracle
 
 - `assets/solver-toolkit` 统一返回 incumbent、有效 bound/gap、固定种子、耗时和原始解；没有数学 bound 时强制让 gap 为空；
+- `assets/predict-toolkit` 把嵌套样本外验证、时序可用性、校准、漂移和排名翻转整理为可复用接口；
+- `assets/mechanism-toolkit` 提供 ODE、方法线一维传热、多起点参数辨识和蒙特卡洛/准蒙特卡洛；缺少合格收敛证书或参数不可识别时结构性清空过强点值；
 - 小规模验证优先完全枚举或 `scipy.optimize.milp` 精确 oracle，区分 `exact_match`、`suboptimal` 与 `not_reducible`；
 - 三个结构化配方覆盖连续黑箱优化、资源时序 MILP、几何/运动覆盖，并把真实失败模式与可运行示例放在算法名称之前；
 - 优秀论文数值仅作参照，不参与自动 PASS/BLOCK 判定。
@@ -126,7 +128,9 @@ cumcm-modeling/
 ├── agents/openai.yaml
 ├── assets/
 │   ├── project-template/
-│   └── solver-toolkit/
+│   ├── solver-toolkit/
+│   ├── predict-toolkit/
+│   └── mechanism-toolkit/
 ├── references/
 │   ├── profiles.md
 │   ├── contracts.md
@@ -147,6 +151,7 @@ cumcm-modeling/
 │   ├── init_project.py
 │   ├── audit_project.py
 │   ├── export_validation_matrix.py
+│   ├── export_scenario_status.py
 │   ├── manifest.py
 │   ├── record_gate_review.py
 │   └── lint_paper.py
@@ -158,6 +163,9 @@ tests/
 ├── test_audit_snapshot_security.py
 ├── test_build_and_proof_receipts.py
 ├── test_contract_parsing.py
+├── test_executable_scenarios.py
+├── test_forward_testing_doc.py
+├── test_identifiability_guard.py
 ├── test_initialization_and_run_times.py
 ├── test_lint_regressions.py
 ├── test_lock_sidecar_security.py
@@ -184,7 +192,9 @@ evals/
 ├── scenario_set_holdout_isolation_scenario.json
 ├── run_scenario_set_holdout_isolation.py
 ├── decision_timing_comparability_scenario.json
-└── run_decision_timing_comparability.py
+├── run_decision_timing_comparability.py
+├── e21_identifiability_guard_scenario.json
+└── run_identifiability_guard.py
 ~~~
 
 ## 安装
@@ -296,7 +306,7 @@ python -X utf8 cumcm-modeling/scripts/init_project.py ./work/cumcm-a \
   --default-seed 42 --paper-engine latex
 ~~~
 
-初始化器只创建缺失文件，不覆盖已有目标。新项目必须显式提供 `--contest-year`，不会从系统时间或项目 ID 猜测年份；问题代码、默认种子和论文引擎也会写入初始化记录。完整项目无参数重复调用时顶层返回 PASS、退出码为 0，每个已有文件的 finding 为 NOT_APPLICABLE，且文件字节保持不变。初始化相关的五类拒绝都会在写入前发生且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数无法从现有记录核验且没有缺失文件会消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源互相矛盾时返回 `EXISTING_INITIALIZATION_INVALID`。当前模板新建的契约版本为 `2.4.0`；读取与审计继续接受合法 `2.x.x`（包括旧 `2.0.0`、`2.0.1`、`2.1.0`、`2.2.0` 与 `2.3.x`），重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 仍须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时仍可读取，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；旧 `2.1.x` optimization 模型缺少新引入的 `objective_reconciliation` 检查时也仍可读取，由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding；旧 `2.2.x` 项目缺少 `scenario_sets` 或 optimization 的 `holdout_leakage` 检查时仍可读取，由审计器返回明确的 `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED` / `SCENARIO_HOLDOUT_CHECK_REQUIRED` finding；旧 `2.3.x` 项目若以空 formulation 支撑 final 定量 claim，或优化证据未对应 `optimization` facet，则分别返回 `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` / `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`。以上缺项都必须按真实语义显式补齐，不会静默推断或自动改写。新模板包含明确占位内容；未执行的普通 partial 允许 `started_at`/`finished_at` 为 `null`/`null`，success、failed 与实际 promotion-trigger partial 仍须通过语义审计绑定真实且有序的时间区间。填入真实题面、模型、运行和审批前，审计返回 BLOCK 或 STALE 属于正常结果。
+初始化器只创建缺失文件，不覆盖已有目标。新项目必须显式提供 `--contest-year`，不会从系统时间或项目 ID 猜测年份；问题代码、默认种子和论文引擎也会写入初始化记录。完整项目无参数重复调用时顶层返回 PASS、退出码为 0，每个已有文件的 finding 为 NOT_APPLICABLE，且文件字节保持不变。初始化相关的五类拒绝都会在写入前发生且退出码均为 `10`：新项目缺少 `--contest-year` 时返回 `CONTEST_YEAR_REQUIRED`；显式参数取值非法（如 `--problem-code ""`）时返回 `INITIALIZATION_PARAMETER_INVALID`；显式参数与已记录值冲突时返回 `INITIALIZATION_PARAMETER_CONFLICT`；参数无法从现有记录核验且没有缺失文件会消费时返回 `INITIALIZATION_PARAMETER_UNVERIFIABLE`；多个现有来源互相矛盾时返回 `EXISTING_INITIALIZATION_INVALID`。当前模板新建的契约版本为 `2.5.0`；读取与审计继续接受合法 `2.x.x`（包括旧 `2.0.0`、`2.0.1`、`2.1.0`、`2.2.0`、`2.3.x` 与 `2.4.x`），重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 仍须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时仍可读取，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；旧 `2.1.x` optimization 模型缺少新引入的 `objective_reconciliation` 检查时也仍可读取，由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding；旧 `2.2.x` 项目缺少 `scenario_sets` 或 optimization 的 `holdout_leakage` 检查时仍可读取，由审计器返回明确的 `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED` / `SCENARIO_HOLDOUT_CHECK_REQUIRED` finding；旧 `2.3.x` 项目若以空 formulation 支撑 final 定量 claim，或优化证据未对应 `optimization` facet，则分别返回 `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` / `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`；旧 `2.4.x` 结果若把不可识别参数点估计绑定为 final 定量 claim，则返回 `UNIDENTIFIABLE_POINT_ESTIMATE_CLAIM_MIGRATION_REQUIRED`。以上缺项都必须按真实语义显式补齐，不会静默推断或自动改写。新模板包含明确占位内容；未执行的普通 partial 允许 `started_at`/`finished_at` 为 `null`/`null`，success、failed 与实际 promotion-trigger partial 仍须通过语义审计绑定真实且有序的时间区间。填入真实题面、模型、运行和审批前，审计返回 BLOCK 或 STALE 属于正常结果。
 
 只查看将要创建的内容：
 

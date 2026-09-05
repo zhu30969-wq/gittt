@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "id": "E03-heuristic-optimum",
   "fixture_profile": "e03-heuristic-optimum",
   "base_fixture_profile": "e01-optimization",

@@ -1,4 +1,4 @@
-schema_version: "2.4.0"
+schema_version: "2.5.0"
 purpose: "Behavioral forward tests for the cumcm-modeling skill"
 scenarios:
   - id: "E01-complete-chain"
@@ -149,3 +149,11 @@ scenarios:
     expected_invariants:
       - "A comparison between experiments with different decision_timing values is blocked."
       - "The same comparison passes after both experiments use the same decision_timing value."
+  - id: "E21-identifiability-guard"
+    status: "executable"
+    fixture: "e21_identifiability_guard_scenario.json"
+    executable: "run_identifiability_guard.py"
+    expected_invariants:
+      - "A structurally unidentifiable product-only parameterization cannot expose a point_estimate from IdentificationResult."
+      - "Parameter intervals and identifiable combinations remain available when the point estimate is suppressed."
+      - "A contract that manually restores an unidentifiable point estimate and binds it to a final numeric claim is blocked and its result becomes ineligible."

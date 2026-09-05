@@ -137,6 +137,7 @@ FORMULA_VALIDATION_CHECKS = {"dimensional_consistency", "domain_validity", "form
 OBJECTIVE_RECONCILIATION_INTRODUCED_VERSION = (2, 2, 0)
 SCENARIO_SETS_INTRODUCED_VERSION = (2, 3, 0)
 MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION = (2, 4, 0)
+IDENTIFIABILITY_GUARD_INTRODUCED_VERSION = (2, 5, 0)
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 PAPER_COMPILERS_BY_ENGINE = {
     "latex": {"latexmk", "xelatex", "lualatex", "pdflatex", "tectonic"},
@@ -262,6 +263,14 @@ def model_evidence_consistency_code(model: dict[str, Any], current_code: str) ->
     """Keep pre-2.4 contracts readable while naming their required migration."""
 
     if contract_version_tuple(model) < MODEL_EVIDENCE_CONSISTENCY_INTRODUCED_VERSION:
+        return f"{current_code}_MIGRATION_REQUIRED"
+    return current_code
+
+
+def identifiability_guard_code(result: dict[str, Any], current_code: str) -> str:
+    """Keep pre-2.5 results readable while naming the guard migration."""
+
+    if contract_version_tuple(result) < IDENTIFIABILITY_GUARD_INTRODUCED_VERSION:
         return f"{current_code}_MIGRATION_REQUIRED"
     return current_code
 
@@ -1973,6 +1982,9 @@ class Audit:
         experiments_by_id = {document.get("id"): document for document in experiments}
         results_by_id = {document.get("id"): document for document in results}
         quantitative_final_claims_by_model: dict[str, set[str]] = defaultdict(set)
+        final_numeric_claims_by_result_metric: dict[
+            tuple[str, str], set[str]
+        ] = defaultdict(set)
         for registry in claims_docs:
             for claim in registry.get("claims", []):
                 claim_id = claim.get("id")
@@ -1996,6 +2008,20 @@ class Audit:
                     model_ref = experiment.get("model_ref") if isinstance(experiment, dict) else None
                     if model_ref in models_by_id:
                         quantitative_final_claims_by_model[str(model_ref)].add(claim_id)
+                result_refs = {
+                    str(evidence.get("ref"))
+                    for evidence in claim.get("evidence_refs", [])
+                    if isinstance(evidence, dict)
+                    and evidence.get("ref") in results_by_id
+                }
+                for assertion in claim.get("numeric_assertions", []):
+                    metric_ref = assertion.get("metric_ref")
+                    if not isinstance(metric_ref, str):
+                        continue
+                    for result_ref in result_refs:
+                        final_numeric_claims_by_result_metric[
+                            (result_ref, metric_ref)
+                        ].add(claim_id)
         self.validate_model_promotions(promotions, models_by_id, experiments_by_id, results_by_id)
         question_owner_by_id: dict[str, str] = {}
         questions_by_id: dict[str, dict[str, Any]] = {}
@@ -3428,6 +3454,56 @@ class Audit:
                         artifact_id=result_id,
                     )
                     eligible = False
+
+                identification = diagnostic.get("parameter_identification")
+                if (
+                    diagnostic.get("check_type") == "identifiability"
+                    and isinstance(identification, dict)
+                    and identification.get("identifiable") is False
+                    and isinstance(identification.get("point_estimate"), dict)
+                    and bool(identification.get("point_estimate"))
+                ):
+                    estimate_metric_refs = {
+                        str(metric_ref)
+                        for metric_ref in identification.get(
+                            "point_estimate_metric_refs", []
+                        )
+                        if isinstance(metric_ref, str)
+                    }
+                    claim_bindings = {
+                        metric_ref: sorted(
+                            final_numeric_claims_by_result_metric.get(
+                                (str(result_id), metric_ref), set()
+                            )
+                        )
+                        for metric_ref in sorted(estimate_metric_refs)
+                        if final_numeric_claims_by_result_metric.get(
+                            (str(result_id), metric_ref)
+                        )
+                    }
+                    if claim_bindings:
+                        code = identifiability_guard_code(
+                            result, "UNIDENTIFIABLE_POINT_ESTIMATE_CLAIM"
+                        )
+                        migration_note = (
+                            f" schema_version={result.get('schema_version')!r} predates "
+                            "the 2.5.0 identifiability guard and must be migrated;"
+                            if code.endswith("_MIGRATION_REQUIRED")
+                            else ""
+                        )
+                        self.add(
+                            "G4",
+                            "BLOCK",
+                            code,
+                            (
+                                f"{result_id}/{diagnostic.get('id')}{migration_note} "
+                                "records identifiable=false but exposes a point estimate "
+                                f"used by final numeric claim(s): {claim_bindings}; publish "
+                                "parameter intervals or identifiable combinations instead"
+                            ),
+                            artifact_id=result_id,
+                        )
+                        eligible = False
 
                 status = diagnostic.get("status")
                 is_expected_trigger = bool(

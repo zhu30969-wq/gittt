@@ -106,6 +106,7 @@ D:\WUMIAN\ZHUOMIAN\数学建模agent\cumcm-modeling\SKILL.md
 | 结构化产物、ID、散列、Schema、证据关系 | [`contracts.md`](cumcm-modeling/references/contracts.md) |
 | 候选模型、baseline、风险探针、fallback | [`model-selection.md`](cumcm-modeling/references/model-selection.md) |
 | 数据处理、代码、实验与条件性验证 | [`validation.md`](cumcm-modeling/validation.md) |
+| ODE、传热、参数辨识与不确定性传播 | [`mechanism-ode-and-identification.md`](cumcm-modeling/references/recipes/mechanism-ode-and-identification.md) |
 | 三人协作、交接与 approval set | [`team-collaboration.md`](cumcm-modeling/references/team-collaboration.md) |
 | 论文、图表、编译、PDF 与发布包 | [`paper-delivery.md`](cumcm-modeling/references/paper-delivery.md) |
 | 摘要起草、压缩或审计 | [`abstract.md`](cumcm-modeling/references/abstract.md) |
@@ -117,7 +118,7 @@ D:\WUMIAN\ZHUOMIAN\数学建模agent\cumcm-modeling\SKILL.md
 
 当前版本提供：
 
-当前模板生成的结构化契约版本为 `2.4.0`；工具继续读取和审计合法 `2.x.x`（包括旧 `2.0.0`、`2.0.1`、`2.1.0`、`2.2.0` 与 `2.3.x`），无参数重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 项目须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；旧 `2.1.x` optimization 模型缺少新引入的 `objective_reconciliation` 时，由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding；旧 `2.2.x` 项目缺少 `scenario_sets` 或 optimization 的 `holdout_leakage` 检查时仍可读取，由审计器返回明确的 `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED` / `SCENARIO_HOLDOUT_CHECK_REQUIRED` finding；旧 `2.3.x` 项目命中空 formulation 支撑 final 定量 claim 或优化证据/facet 不一致时，分别返回 `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` / `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`。以上缺项都应依据真实语义显式补值，工具不会静默推断或自动改写。
+当前模板生成的结构化契约版本为 `2.5.0`；工具继续读取和审计合法 `2.x.x`（包括旧 `2.0.0`、`2.0.1`、`2.1.0`、`2.2.0`、`2.3.x` 与 `2.4.x`），无参数重复初始化不会自动迁移版本或改写旧项目字节，`1.x` 项目须先迁移。旧 `2.0.1` experiment 缺少 `decision_timing` 时，审计器会返回明确的 `DECISION_TIMING_REQUIRED` finding；旧 `2.1.x` optimization 模型缺少新引入的 `objective_reconciliation` 时，由 G2 返回明确的 `OBJECTIVE_RECONCILIATION_REQUIRED` finding；旧 `2.2.x` 项目缺少 `scenario_sets` 或 optimization 的 `holdout_leakage` 检查时仍可读取，由审计器返回明确的 `SCENARIO_SETS_LEGACY_MIGRATION_REQUIRED` / `SCENARIO_HOLDOUT_CHECK_REQUIRED` finding；旧 `2.3.x` 项目命中空 formulation 支撑 final 定量 claim 或优化证据/facet 不一致时，分别返回 `EMPTY_FORMULATION_SUPPORTS_CLAIM_MIGRATION_REQUIRED` / `FAMILY_EVIDENCE_MISMATCH_MIGRATION_REQUIRED`；旧 `2.4.x` 结果若把不可识别参数点估计绑定为 final 定量 claim，则返回 `UNIDENTIFIABLE_POINT_ESTIMATE_CLAIM_MIGRATION_REQUIRED`。以上缺项都应依据真实语义显式补值，工具不会静默推断或自动改写。
 
 - `INTAKE → G0–G7 → SUBMISSION_READY` 单入口状态机；
 - 主模型、可信 baseline、风险探针和不可变 fallback 晋升；

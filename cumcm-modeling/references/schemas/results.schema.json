@@ -156,6 +156,67 @@
               "reconciliation_method": {"$ref": "common.schema.json#/$defs/nonBlankString"}
             }
           },
+          "parameter_identification": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "identifiable": {"type": "boolean"},
+              "point_estimate": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": {"type": "number"}
+                  },
+                  {"type": "null"}
+                ]
+              },
+              "point_estimate_metric_refs": {
+                "type": "array",
+                "items": {"$ref": "common.schema.json#/$defs/typedId"},
+                "uniqueItems": true
+              },
+              "parameter_intervals": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "lower": {"type": ["number", "null"]},
+                    "upper": {"type": ["number", "null"]},
+                    "level": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+                    "method": {"$ref": "common.schema.json#/$defs/nonBlankString"}
+                  },
+                  "required": ["lower", "upper", "level", "method"]
+                }
+              },
+              "identifiable_combinations": {
+                "type": "array",
+                "items": {"$ref": "common.schema.json#/$defs/nonBlankString"},
+                "uniqueItems": true
+              },
+              "fit_residual": {"$ref": "common.schema.json#/$defs/measurement"},
+              "holdout_residual": {"$ref": "common.schema.json#/$defs/measurement"},
+              "jacobian_condition_number": {"type": ["number", "null"], "minimum": 0},
+              "maximum_column_correlation": {"type": "number", "minimum": 0, "maximum": 1},
+              "condition_number_threshold": {"type": "number", "exclusiveMinimum": 1},
+              "column_correlation_threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+            },
+            "required": [
+              "identifiable",
+              "point_estimate",
+              "point_estimate_metric_refs",
+              "parameter_intervals",
+              "identifiable_combinations",
+              "fit_residual",
+              "holdout_residual",
+              "jacobian_condition_number",
+              "maximum_column_correlation",
+              "condition_number_threshold",
+              "column_correlation_threshold"
+            ]
+          },
           "source_file": {
             "oneOf": [
               {"$ref": "common.schema.json#/$defs/fileRef"},

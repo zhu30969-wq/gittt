@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "id": "E05-mechanism-convergence",
   "fixture_profile": "analytic-harmonic-oscillator",
   "theoretical_order": 4.0,

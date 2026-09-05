@@ -21,7 +21,7 @@
 
 | 状态 | 数量 | 完整 ID 清单 |
 |---|---:|---|
-| `executable` | 11 | `E01-complete-chain`、`E02-time-series-leakage`、`E03-heuristic-optimum`、`E04-ranking-stability`、`E05-mechanism-convergence`、`E11-baseline-evidence`、`E12-structured-diagnostic`、`E17-held-out-resume`、`E18-hybrid-validation-facet-union`、`E19-scenario-set-holdout-isolation`、`E20-decision-timing-comparability` |
+| `executable` | 12 | `E01-complete-chain`、`E02-time-series-leakage`、`E03-heuristic-optimum`、`E04-ranking-stability`、`E05-mechanism-convergence`、`E11-baseline-evidence`、`E12-structured-diagnostic`、`E17-held-out-resume`、`E18-hybrid-validation-facet-union`、`E19-scenario-set-holdout-isolation`、`E20-decision-timing-comparability`、`E21-identifiability-guard` |
 | `specification_only` | 9 | `E06-stale-propagation`、`E07-paper-engine-isolation`、`E08-human-science-boundary`、`E09-posthoc-and-derived-numbers`、`E10-input-role-preflight`、`E13-release-pdf`、`E14-immutable-fallback-promotion`、`E15-paper-build-and-proof-package`、`E16-code-deliverable-closure` |
 <!-- END GENERATED: scenario-status -->
 

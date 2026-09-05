@@ -909,7 +909,7 @@ def main() -> int:
     save_yaml(target, "figures/figures.yaml", figures)
 
     paper_build = {
-        "schema_version": "2.4.0",
+        "schema_version": "2.5.0",
         "kind": "paper_build",
         "id": "build:paper",
         "revision": 1,

@@ -238,6 +238,17 @@ class ExecutableScenarioRegistryTests(unittest.TestCase):
         )
         self.assertEqual("DECISION_TIMING_MISMATCH", config["expected_code"])
 
+    def test_e21_config_matches_the_registry_contract(self) -> None:
+        config = self.fixture_for("E21-identifiability-guard")
+        self.assertEqual(2, len(config["parameter_bounds"]))
+        self.assertGreaterEqual(config["starts"], 2)
+        self.assertGreater(config["sample_count"], 2 * config["fit_stride"])
+        self.assertEqual("k1*k2", config["identifiable_combination"])
+        self.assertEqual(
+            "UNIDENTIFIABLE_POINT_ESTIMATE_CLAIM",
+            config["expected_finding"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

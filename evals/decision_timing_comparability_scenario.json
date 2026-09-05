@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "id": "E20-decision-timing-comparability",
   "fixture_profile": "e20-decision-timing-comparability",
   "primary_timing": "here_and_now",

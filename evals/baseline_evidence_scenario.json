@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "id": "E11-baseline-evidence",
   "fixture_profile": "e11-primary-and-simple-baseline",
   "coverage_failure_code": "BASELINE_TASK_MISMATCH",

@@ -60,6 +60,7 @@ description: "Orchestrate, continue, or audit CUMCM（全国大学生数学建�
 - 编写代码、运行实验、检查结果可信度：读取 [验证规范](validation.md)。
 - 求解优化与几何/运动仿真问题：按结构选择 [连续黑箱优化](references/recipes/continuous-blackbox-global-optimization.md)、[资源时序 MILP](references/recipes/resource-timing-milp.md) 或 [几何运动覆盖](references/recipes/geometric-kinematic-coverage.md)，并复用其中的统一求解接口与小规模 oracle；论文数值只作参照。
 - 处理预测、分类或时间序列任务：读取 [预测与分类](references/recipes/prediction-and-classification.md)，使用嵌套样本外验证、特征可用时点、校准与漂移边界；处理综合评价、权重或排序任务时改读 [评价与排序](references/recipes/evaluation-and-ranking.md)，不要同时加载无关配方。
+- 处理 ODE、传热、参数辨识或蒙特卡洛不确定性传播：读取 [ODE、传热与参数辨识](references/recipes/mechanism-ode-and-identification.md)，先验证边界、收敛阶和可识别性；没有有效证书时不得把最细网格值或病态参数点估计升级为论文结论。
 - 组织三人分工、交接、冲突解决或审批：读取 [团队协作](references/team-collaboration.md)；评估竞赛时限内的登记成本、维护瓶颈或复跑自动化时，再读 [真实走查维护成本](references/field-run-maintainability.md)。
 - 阶段评审、质量评分或决定是否前进：读取 [能力量表](references/rubric.md)。
 - 写作、编译、图表和最终 PDF：读取 [论文交付](references/paper-delivery.md)。

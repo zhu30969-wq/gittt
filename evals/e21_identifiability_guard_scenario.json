@@ -1,0 +1,16 @@
+{
+  "schema_version": "2.5.0",
+  "id": "E21-identifiability-guard",
+  "fixture_profile": "synthetic-product-only-parameter-identification",
+  "true_product": 6.0,
+  "sample_count": 20,
+  "fit_stride": 2,
+  "parameter_bounds": {
+    "k1": [1.0, 4.0],
+    "k2": [1.5, 6.0]
+  },
+  "starts": 6,
+  "seed": 31,
+  "identifiable_combination": "k1*k2",
+  "expected_finding": "UNIDENTIFIABLE_POINT_ESTIMATE_CLAIM"
+}

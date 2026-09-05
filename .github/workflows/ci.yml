@@ -35,6 +35,7 @@ jobs:
             cumcm-modeling/scripts/requirements.txt
             cumcm-modeling/assets/solver-toolkit/requirements.txt
             cumcm-modeling/assets/predict-toolkit/requirements.txt
+            cumcm-modeling/assets/mechanism-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
@@ -46,6 +47,9 @@ jobs:
 
       - name: Install prediction toolkit dependencies
         run: python -m pip install -r cumcm-modeling/assets/predict-toolkit/requirements.txt
+
+      - name: Install mechanism toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/mechanism-toolkit/requirements.txt
 
       - name: Fetch pinned quick_validate
         env:
@@ -149,6 +153,9 @@ jobs:
       - name: Run standalone prediction toolkit tests
         run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/predict-toolkit/tests -p "test_*.py" -v
 
+      - name: Run standalone mechanism toolkit tests
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/mechanism-toolkit/tests -p "test_*.py" -v
+
       - name: Run solver recipe examples
         run: |
           python -X utf8 cumcm-modeling/references/recipes/examples/continuous_blackbox.py
@@ -159,6 +166,9 @@ jobs:
         run: |
           python -X utf8 cumcm-modeling/references/recipes/examples/prediction_and_classification.py
           python -X utf8 cumcm-modeling/references/recipes/examples/evaluation_and_ranking.py
+
+      - name: Run mechanism recipe example
+        run: python -X utf8 cumcm-modeling/references/recipes/examples/mechanism_ode_and_identification.py
 
       - name: Verify initializer CLI refusal and conflict preservation
         shell: bash
@@ -358,6 +368,12 @@ jobs:
           python -X utf8 evals/run_decision_timing_comparability.py \
             "$RUNNER_TEMP/cumcm-e20-decision-timing"
 
+      - name: Exercise E21 identifiability guard
+        shell: bash
+        run: |
+          python -X utf8 evals/run_identifiability_guard.py \
+            "$RUNNER_TEMP/cumcm-e21-identifiability-guard"
+
       - name: Positive paper lint
         run: |
           python -X utf8 cumcm-modeling/scripts/lint_paper.py \
@@ -425,6 +441,7 @@ jobs:
             cumcm-modeling/scripts/requirements.txt
             cumcm-modeling/assets/solver-toolkit/requirements.txt
             cumcm-modeling/assets/predict-toolkit/requirements.txt
+            cumcm-modeling/assets/mechanism-toolkit/requirements.txt
 
       - name: Install validation dependencies
         run: |
@@ -437,6 +454,9 @@ jobs:
       - name: Install prediction toolkit dependencies
         run: python -m pip install -r cumcm-modeling/assets/predict-toolkit/requirements.txt
 
+      - name: Install mechanism toolkit dependencies
+        run: python -m pip install -r cumcm-modeling/assets/mechanism-toolkit/requirements.txt
+
       - name: Run complete Windows unittest suite
         run: python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
 
@@ -445,6 +465,9 @@ jobs:
 
       - name: Run standalone prediction toolkit tests on Windows
         run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/predict-toolkit/tests -p "test_*.py" -v
+
+      - name: Run standalone mechanism toolkit tests on Windows
+        run: python -X utf8 -m unittest discover -s cumcm-modeling/assets/mechanism-toolkit/tests -p "test_*.py" -v
 
       - name: Exercise E02 temporal leakage detection on Windows
         shell: pwsh
@@ -478,6 +501,8 @@ jobs:
           python -X utf8 evals/run_scenario_set_holdout_isolation.py (Join-Path $env:RUNNER_TEMP 'cumcm-e19-scenario-isolation')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -X utf8 evals/run_decision_timing_comparability.py (Join-Path $env:RUNNER_TEMP 'cumcm-e20-decision-timing')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -X utf8 evals/run_identifiability_guard.py (Join-Path $env:RUNNER_TEMP 'cumcm-e21-identifiability-guard')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build and audit synthetic release on Windows
